@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(Get-ChildItem -Path \"c:\\\\opt\\\\Projects\\\\momera\" -Recurse -File -Filter \"*.dart\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Read(//c/Users/zhang/AppData/Local/Pub/Cache/hosted/pub.dev/docx_to_text-1.0.1/lib/**)",
+      "Read(//c/Users/zhang/AppData/Local/Pub/Cache/hosted/pub.dev/pdfx-2.9.2/lib/**)",
+      "Read(//c/Users/zhang/AppData/Local/Pub/Cache/hosted/pub.dev/excel-4.0.6/**)",
+      "Bash(dir \"C:\\\\Users\\\\zhang\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\\\\pub.dev\\\\excel-4.0.6\\\\lib\" /b)",
+      "Bash(xargs grep -l \"class Data \")",
+      "Bash(flutter build *)",
+      "Bash(./gradlew.bat :app:assembleDebug --console=plain)",
+      "PowerShell(& \"C:\\\\opt\\\\Projects\\\\momera\\\\android\\\\gradlew.bat\" --stop -p \"C:\\\\opt\\\\Projects\\\\momera\\\\android\" 2>&1 | Select-Object -Last 1; $os = Get-CimInstance Win32_OperatingSystem; \"Free MB: {0:N0}\" -f \\($os.FreePhysicalMemory/1KB\\))",
+      "PowerShell(flutter analyze lib/presentation/widgets/moments_canvas.dart lib/presentation/screens/home_screen.dart lib/presentation/providers/moments_provider.dart)"
+    ]
+  }
+}

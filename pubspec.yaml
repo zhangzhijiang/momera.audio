@@ -1,0 +1,54 @@
+name: momera_audio
+description: An audio recorder with offline speech-to-text transcription.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Audio recording (records 16 kHz mono WAV — transcription-ready)
+  record: ^6.2.0
+
+  # Audio playback
+  just_audio: ^0.10.5
+
+  # Offline speech-to-text (file transcription via SenseVoice + Silero VAD)
+  sherpa_onnx: ^1.13.0
+
+  # Filesystem / model download / misc
+  path_provider: ^2.1.3
+  path: ^1.9.0
+  http: ^1.2.0 # downloads the SenseVoice model at runtime
+  permission_handler: ^12.0.1
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: "^0.14.4"
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # NOTE: model.int8.onnx (~228 MB) is intentionally NOT bundled. It is
+    # downloaded at runtime by ModelDownloadService to keep the app package
+    # small. Only the small support files are bundled below.
+    - assets/models/sensevoice/tokens.txt
+    - assets/models/silero_vad/silero_vad.onnx
+    - assets/icon/
+
+# Flutter Launcher Icons configuration
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/icon/momera_logo.png"
+  min_sdk_android: 21

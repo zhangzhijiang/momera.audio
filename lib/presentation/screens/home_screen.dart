@@ -1,0 +1,219 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/utils/app_theme.dart';
+import '../providers/recordings_provider.dart';
+import '../providers/service_providers.dart';
+import '../widgets/record_button.dart';
+import '../widgets/recording_tile.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _isRecording = false;
+  Duration _elapsed = Duration.zero;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _toggleRecording() async {
+    final recorder = ref.read(audioRecordingServiceProvider);
+
+    if (_isRecording) {
+      await recorder.stopRecording();
+      _timer?.cancel();
+      setState(() {
+        _isRecording = false;
+        _elapsed = Duration.zero;
+      });
+      await ref.read(recordingsProvider.notifier).refresh();
+      return;
+    }
+
+    final path = await recorder.startRecording();
+    if (path == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Microphone permission is required to record.'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _isRecording = true;
+      _elapsed = Duration.zero;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _elapsed += const Duration(seconds: 1));
+    });
+  }
+
+  String _formatElapsed(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recordingsAsync = ref.watch(recordingsProvider);
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        title: const Text(
+          'Momera.Audio',
+          style: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimary,
+            letterSpacing: -0.3,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: recordingsAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Failed to load: $e')),
+                data: (recordings) {
+                  if (recordings.isEmpty) return const _EmptyState();
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: recordings.length,
+                    itemBuilder: (context, i) =>
+                        RecordingTile(recording: recordings[i]),
+                  );
+                },
+              ),
+            ),
+            _RecordBar(
+              isRecording: _isRecording,
+              elapsedLabel: _formatElapsed(_elapsed),
+              onTap: _toggleRecording,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecordBar extends StatelessWidget {
+  const _RecordBar({
+    required this.isRecording,
+    required this.elapsedLabel,
+    required this.onTap,
+  });
+
+  final bool isRecording;
+  final String elapsedLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      decoration: const BoxDecoration(
+        color: AppTheme.surface,
+        border: Border(top: BorderSide(color: AppTheme.borderLight)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 22,
+            child: isRecording
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const _RecPulse(),
+                      const SizedBox(width: 8),
+                      Text(
+                        elapsedLabel,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  )
+                : const Text(
+                    'Tap to record',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 10),
+          RecordButton(isRecording: isRecording, onTap: onTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecPulse extends StatelessWidget {
+  const _RecPulse();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: const BoxDecoration(
+        color: AppTheme.recordRed,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.mic_none_rounded, size: 56, color: AppTheme.textHint),
+          SizedBox(height: 12),
+          Text(
+            'No recordings yet',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Tap the record button to capture audio.',
+            style: TextStyle(fontSize: 13, color: AppTheme.textHint),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Momera.Audio does not track users. There is deliberately no
+	     NSPrivacyTrackingDomains key: Apple rejects a manifest that declares
+	     tracking domains with NSPrivacyTracking false, and equally rejects
+	     NSPrivacyTracking true with an empty domain list (ITMS-91064). -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+
+	<!-- Nothing leaves the device. Audio is recorded locally and transcribed
+	     by an on-device model; there is no analytics, ads or crash SDK. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- RecordingRepository.list() calls File.stat() and reads
+			     stat.modified to date recordings whose filename does not
+			     carry a parseable timestamp. Files are inside the app
+			     container, which is reason C617.1. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

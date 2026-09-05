@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -11,8 +12,15 @@ import 'package:path_provider/path_provider.dart';
 ///
 /// The model (`model.int8.onnx`, ~228 MB) is far too large to ship inside the
 /// Android App Bundle / IPA, so it is fetched on first use and cached in the
-/// app documents directory. Downloads are resumable (HTTP Range) and verified
+/// app *support* directory. Downloads are resumable (HTTP Range) and verified
 /// by byte length before being marked ready.
+///
+/// Storage location matters on iOS: re-downloadable content must NOT live in
+/// `Documents/`, which is backed up to iCloud and cannot be purged. Apple
+/// rejects apps that put re-creatable data there. `getApplicationSupportDirectory()`
+/// maps to `Library/Application Support`, and the directory is additionally
+/// flagged do-not-back-up. User recordings are different — they are genuine
+/// user-generated content and stay in `Documents/` (see RecordingRepository).
 class ModelDownloadService {
   /// Sources the model is fetched from, tried in order until one succeeds.
   /// A partially downloaded file is resumed against the next source since all
@@ -31,10 +39,19 @@ class ModelDownloadService {
 
   static const String _fileName = 'model.int8.onnx';
 
+  /// Root directory for all downloaded/derived model files.
+  ///
+  /// `Library/Application Support` on iOS/macOS, and the equivalent private
+  /// app-data directory on Android — never `Documents/`.
+  static Future<Directory> modelsRoot() async {
+    final appDir = await getApplicationSupportDirectory();
+    return Directory(path.join(appDir.path, 'models'));
+  }
+
   /// Final on-disk location of the model once fully downloaded.
   static Future<File> modelFile() async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final dir = Directory(path.join(appDir.path, 'models', 'sensevoice'));
+    final root = await modelsRoot();
+    final dir = Directory(path.join(root.path, 'sensevoice'));
     return File(path.join(dir.path, _fileName));
   }
 
@@ -57,6 +74,7 @@ class ModelDownloadService {
     if (await isModelReady()) return file;
 
     await file.parent.create(recursive: true);
+    await _excludeFromBackup(file.parent);
 
     Object? lastError;
     for (final url in modelUrls) {
@@ -143,6 +161,27 @@ class ModelDownloadService {
       client.close();
     }
   }
+
+  /// Mark [dir] as excluded from iCloud/iTunes backup.
+  ///
+  /// No-op off Apple platforms. This is belt-and-braces on top of using
+  /// Application Support: Apple's guidance is that re-downloadable content is
+  /// either kept out of Documents *or* flagged, and doing both is free.
+  static Future<void> _excludeFromBackup(Directory dir) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS &&
+        defaultTargetPlatform != TargetPlatform.macOS) {
+      return;
+    }
+    try {
+      await _backupChannel.invokeMethod<void>('excludeFromBackup', dir.path);
+    } catch (e) {
+      // Never fail a download because the hint could not be applied.
+      debugPrint('Could not set do-not-back-up on ${dir.path}: $e');
+    }
+  }
+
+  static const MethodChannel _backupChannel =
+      MethodChannel('com.idatagear.momera.audio/backup');
 
   /// Delete the cached model (and any partial download). Useful for a
   /// "free up space" / re-download action in settings.

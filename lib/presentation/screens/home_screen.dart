@@ -86,6 +86,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: SafeArea(
         child: Column(
+          // The record bar is a full-width bottom bar (it draws a top border
+          // across the screen). Column defaults to CrossAxisAlignment.center,
+          // which would shrink it to the intrinsic width of its contents and
+          // leave it floating as a narrow card.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: recordingsAsync.when(

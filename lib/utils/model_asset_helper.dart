@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../core/services/model_download_service.dart';
 
@@ -24,7 +23,9 @@ class ModelAssetHelper {
   /// model file paths. Assumes the STT model has already been downloaded —
   /// guard with [isModelReady] first.
   static Future<ModelPaths> resolveModelPaths() async {
-    final appDir = await getApplicationDocumentsDirectory();
+    // All model files live under Application Support, never Documents —
+    // see ModelDownloadService for why.
+    final modelsRoot = await ModelDownloadService.modelsRoot();
 
     // STT model (SenseVoice) — downloaded at runtime, not bundled.
     final modelFile = await ModelDownloadService.modelFile();
@@ -41,7 +42,7 @@ class ModelAssetHelper {
     }
 
     // VAD model (Silero VAD) — small (~600 KB), stays bundled.
-    final vadDir = Directory(path.join(appDir.path, 'models', 'silero_vad'));
+    final vadDir = Directory(path.join(modelsRoot.path, 'silero_vad'));
     if (!await vadDir.exists()) {
       await vadDir.create(recursive: true);
     }

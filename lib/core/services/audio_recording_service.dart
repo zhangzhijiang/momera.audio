@@ -76,10 +76,15 @@ class AudioRecordingService {
   Completer<RecordingResult?>? _finished;
 
   bool _isRecording = false;
+  bool _isPaused = false;
   int _bytesWritten = 0;
   int _byteBudget = 0;
 
   bool get isRecording => _isRecording;
+
+  /// Paused mid-recording: the session and the file stay open, and audio
+  /// arriving from the platform is discarded until [resume].
+  bool get isPaused => _isPaused;
 
   /// Bytes of audio captured in the current recording.
   int get bytesWritten => _bytesWritten;
@@ -150,6 +155,7 @@ class AudioRecordingService {
 
     _pcmFile = pcmFile;
     _sink = pcmFile.openWrite();
+    _isPaused = false;
     _bytesWritten = 0;
     _byteBudget = availableBytes;
     _isRecording = true;
@@ -186,6 +192,12 @@ class AudioRecordingService {
     void Function(RecordingResult result)? onStopped,
   ) {
     if (!_isRecording) return;
+    // While paused the microphone stream is left running and its audio is
+    // dropped. Stopping the platform recorder instead would end the stream and
+    // tear down the session, which on iOS also drops the background audio
+    // assertion — the app would stop being allowed to run with the screen
+    // locked, and could not resume.
+    if (_isPaused) return;
 
     final remaining = _byteBudget - _bytesWritten;
     if (remaining <= 0) {
@@ -212,6 +224,20 @@ class AudioRecordingService {
     } catch (e) {
       debugPrint('AudioRecordingService: flush failed: $e');
     }
+  }
+
+  /// Pause capture. Audio arriving while paused is discarded; the file and the
+  /// background session stay open so [resume] is instant.
+  void pause() {
+    if (!_isRecording || _isPaused) return;
+    _isPaused = true;
+    // Flush now so a crash while paused keeps everything up to this point.
+    _flush();
+  }
+
+  void resume() {
+    if (!_isRecording || !_isPaused) return;
+    _isPaused = false;
   }
 
   /// Stop recording at the user's request and finalise the WAV.
@@ -263,6 +289,7 @@ class AudioRecordingService {
     }
 
     _bytesWritten = 0;
+    _isPaused = false;
     _finished?.complete(result);
 
     if (result != null && reason != RecordingStopReason.user) {

@@ -5,6 +5,63 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '../../utils/model_asset_helper.dart';
 
+/// Languages the SenseVoice model can recognise.
+///
+/// The checkpoint is `sense-voice-zh-en-ja-ko-yue`, and those five are the
+/// whole list. The token vocabulary contains tags for many more languages
+/// (inherited from the vocab it was built on) but this checkpoint is not
+/// trained for them — notably **Spanish is not supported**, even though the app
+/// UI is available in Spanish.
+enum TranscriptionLanguage {
+  /// Detect per speech segment. The model's default, and the right choice for
+  /// a conversation that switches language between utterances.
+  auto(''),
+  mandarin('zh'),
+  cantonese('yue'),
+  english('en'),
+  japanese('ja'),
+  korean('ko');
+
+  const TranscriptionLanguage(this.code);
+
+  /// Value for `OfflineSenseVoiceModelConfig.language`; empty means auto.
+  final String code;
+
+  static TranscriptionLanguage fromName(String? name) =>
+      TranscriptionLanguage.values.firstWhere(
+        (l) => l.name == name,
+        orElse: () => TranscriptionLanguage.auto,
+      );
+
+  /// Maps a language tag reported by the recogniser back to an enum value.
+  /// Tags arrive either bare (`zh`) or wrapped (`<|zh|>`).
+  static TranscriptionLanguage? fromTag(String tag) {
+    final code = tag.replaceAll('<|', '').replaceAll('|>', '').trim();
+    if (code.isEmpty) return null;
+    for (final language in TranscriptionLanguage.values) {
+      if (language != TranscriptionLanguage.auto && language.code == code) {
+        return language;
+      }
+    }
+    return null;
+  }
+}
+
+/// Transcript plus the languages the recogniser detected while producing it.
+@immutable
+class TranscriptionResult {
+  const TranscriptionResult({required this.text, required this.languages});
+
+  final String text;
+
+  /// Languages detected across the recording's speech segments, in the order
+  /// first encountered. More than one entry means the speakers switched
+  /// language during the recording.
+  final List<TranscriptionLanguage> languages;
+
+  bool get isEmpty => text.trim().isEmpty;
+}
+
 /// Thrown by [TranscriptionService.initialize] when the SenseVoice model has
 /// not been downloaded yet. Callers should trigger a model download and retry.
 class ModelNotReadyException implements Exception {
@@ -31,6 +88,10 @@ class TranscriptionService {
   sherpa_onnx.OfflineRecognizer? _recognizer;
   sherpa_onnx.VoiceActivityDetector? _vad;
 
+  /// Language the recogniser was built with. Changing it requires rebuilding
+  /// the recogniser, so it is tracked to detect a stale one.
+  TranscriptionLanguage _language = TranscriptionLanguage.auto;
+
   bool get isInitialized => _recognizer != null && _vad != null;
 
   /// Whether the downloaded STT model is present, without initializing anything.
@@ -38,8 +99,14 @@ class TranscriptionService {
 
   /// Initialize the recognizer and VAD. Throws [ModelNotReadyException] if the
   /// SenseVoice model has not been downloaded yet.
-  Future<void> initialize() async {
+  Future<void> initialize({
+    TranscriptionLanguage language = TranscriptionLanguage.auto,
+  }) async {
+    // The language is baked into the recogniser at construction, so a change
+    // means tearing the old one down rather than ignoring the new setting.
+    if (isInitialized && language != _language) dispose();
     if (isInitialized) return;
+    _language = language;
 
     if (!await ModelAssetHelper.isModelReady()) {
       throw const ModelNotReadyException();
@@ -50,6 +117,10 @@ class TranscriptionService {
 
     final senseVoice = sherpa_onnx.OfflineSenseVoiceModelConfig(
       model: modelPaths.modelPath,
+      // Empty means auto-detect, applied per speech segment — which is what
+      // makes a conversation that switches language work. Pinning a language
+      // helps accuracy when the content is known to be monolingual.
+      language: language.code,
       useInverseTextNormalization: true,
     );
     _recognizer = sherpa_onnx.OfflineRecognizer(
@@ -93,11 +164,12 @@ class TranscriptionService {
   /// yields to the event loop regularly, so the UI keeps painting (a progress
   /// spinner that cannot animate is worse than no spinner) and the app stays
   /// responsive to taps.
-  Future<String> transcribeFile(
+  Future<TranscriptionResult> transcribeFile(
     String wavPath, {
+    TranscriptionLanguage language = TranscriptionLanguage.auto,
     void Function(double progress)? onProgress,
   }) async {
-    if (!isInitialized) await initialize();
+    await initialize(language: language);
 
     final bytes = await File(wavPath).readAsBytes();
     final pcm = _extractPcmData(bytes);
@@ -107,6 +179,9 @@ class TranscriptionService {
     vad.reset();
 
     final buffer = StringBuffer();
+    // Preserves first-seen order, so the UI can show which languages appeared
+    // and in what order they turned up.
+    final detected = <TranscriptionLanguage>[];
 
     // Feed the audio to the VAD in fixed windows and transcribe each completed
     // speech segment.
@@ -117,7 +192,7 @@ class TranscriptionService {
           Float32List.sublistView(samples, offset, offset + _vadWindowSamples);
       vad.acceptWaveform(window);
       while (!vad.isEmpty()) {
-        _appendSegment(vad.front().samples, buffer);
+        _appendSegment(vad.front().samples, buffer, detected);
         vad.pop();
         // Decoding a segment is the expensive step; always yield after one.
         sinceYield = _yieldThreshold;
@@ -136,25 +211,40 @@ class TranscriptionService {
     // Flush any trailing speech the VAD has not yet emitted.
     vad.flush();
     while (!vad.isEmpty()) {
-      _appendSegment(vad.front().samples, buffer);
+      _appendSegment(vad.front().samples, buffer, detected);
       vad.pop();
       await Future<void>.delayed(Duration.zero);
     }
 
     onProgress?.call(1.0);
-    return buffer.toString().trim();
+    return TranscriptionResult(
+      text: buffer.toString().trim(),
+      languages: detected,
+    );
   }
 
-  void _appendSegment(Float32List samples, StringBuffer out) {
+  void _appendSegment(
+    Float32List samples,
+    StringBuffer out,
+    List<TranscriptionLanguage> detected,
+  ) {
     if (_recognizer == null || samples.isEmpty) return;
     final stream = _recognizer!.createStream();
     stream.acceptWaveform(samples: samples, sampleRate: _sampleRate);
     _recognizer!.decode(stream);
     final result = _recognizer!.getResult(stream);
     stream.free();
-    if (result.text.trim().isNotEmpty) {
-      if (out.isNotEmpty) out.write(' ');
-      out.write(result.text.trim());
+    if (result.text.trim().isEmpty) return;
+
+    if (out.isNotEmpty) out.write(' ');
+    out.write(result.text.trim());
+
+    // SenseVoice reports the language it identified for this segment. Segments
+    // are decoded independently, so a recording where speakers switch language
+    // yields several entries here.
+    final language = TranscriptionLanguage.fromTag(result.lang);
+    if (language != null && !detected.contains(language)) {
+      detected.add(language);
     }
   }
 

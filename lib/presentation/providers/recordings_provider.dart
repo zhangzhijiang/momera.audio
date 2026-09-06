@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/transcription_service.dart';
 import '../../data/models/recording.dart';
 import 'service_providers.dart';
 
@@ -38,17 +39,33 @@ class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
     await refresh();
   }
 
-  /// Save a transcript for [recording] and update it in place.
-  Future<void> setTranscript(Recording recording, String transcript) async {
-    await ref
-        .read(recordingRepositoryProvider)
-        .saveTranscript(recording.path, transcript);
+  /// Save a transcript for [recording], with the languages detected while
+  /// producing it, and update the entry in place.
+  Future<void> setTranscript(
+    Recording recording,
+    String transcript, {
+    List<TranscriptionLanguage> languages = const [],
+  }) async {
+    await ref.read(recordingRepositoryProvider).saveTranscript(
+          recording.path,
+          transcript,
+          languages: languages,
+        );
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData([
       for (final r in current)
-        r.path == recording.path ? r.copyWith(transcript: transcript) : r,
+        r.path == recording.path
+            ? r.copyWith(transcript: transcript, languages: languages)
+            : r,
     ]);
+  }
+
+  /// Rename [recording] and refresh, so the list re-sorts and picks up the new
+  /// filename.
+  Future<void> rename(Recording recording, String newBaseName) async {
+    await ref.read(recordingRepositoryProvider).rename(recording, newBaseName);
+    await refresh();
   }
 }
 

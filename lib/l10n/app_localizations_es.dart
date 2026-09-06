@@ -154,4 +154,85 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get playbackFailed => 'No se pudo reproducir esta grabación.';
+
+  @override
+  String get settingsTranscription => 'Transcripción';
+
+  @override
+  String get settingsTranscriptionLanguage => 'Idioma hablado';
+
+  @override
+  String get settingsTranscriptionLanguageSubtitle =>
+      'La detección automática identifica el idioma de cada frase, de modo que una conversación que cambia de idioma se transcribe correctamente. Elige un idioma si el audio siempre está en uno solo.';
+
+  @override
+  String get sttAuto => 'Automático';
+
+  @override
+  String get sttMandarin => 'Chino mandarín';
+
+  @override
+  String get sttCantonese => 'Cantonés';
+
+  @override
+  String get sttEnglish => 'Inglés';
+
+  @override
+  String get sttJapanese => 'Japonés';
+
+  @override
+  String get sttKorean => 'Coreano';
+
+  @override
+  String detectedLanguages(String languages) {
+    return 'Detectado: $languages';
+  }
+
+  @override
+  String get rename => 'Cambiar el nombre';
+
+  @override
+  String get renameTitle => 'Cambiar el nombre de la grabación';
+
+  @override
+  String get renameHint => 'Nombre';
+
+  @override
+  String get renameEmpty => 'Introduce un nombre.';
+
+  @override
+  String get renameExists => 'Ya existe una grabación con ese nombre.';
+
+  @override
+  String get renameFailed => 'No se pudo cambiar el nombre de la grabación.';
+
+  @override
+  String get save => 'Guardar';
+
+  @override
+  String get copyTranscript => 'Copiar la transcripción';
+
+  @override
+  String get copied => 'Transcripción copiada.';
+
+  @override
+  String get share => 'Compartir';
+
+  @override
+  String get shareAudio => 'Compartir el audio';
+
+  @override
+  String get shareTranscript => 'Compartir la transcripción';
+
+  @override
+  String get shareFailed => 'No se pudo compartir esta grabación.';
+
+  @override
+  String get pause => 'Pausar';
+
+  @override
+  String get resume => 'Reanudar';
+
+  @override
+  String get paused => 'En pausa';
 }

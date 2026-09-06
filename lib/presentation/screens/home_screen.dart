@@ -24,6 +24,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isRecording = false;
+  bool _isPaused = false;
   Duration _elapsed = Duration.zero;
   Timer? _timer;
 
@@ -90,6 +91,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     setState(() {
       _isRecording = true;
+      _isPaused = false;
       _elapsed = Duration.zero;
     });
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -117,7 +119,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted) return;
     setState(() {
       _isRecording = false;
+      _isPaused = false;
       _elapsed = Duration.zero;
+    });
+  }
+
+  /// Pause or resume without ending the recording. The file and the background
+  /// session stay open, so this is instant and the elapsed time simply stops
+  /// advancing.
+  void _togglePause() {
+    final recorder = ref.read(audioRecordingServiceProvider);
+    if (!recorder.isRecording) return;
+    setState(() {
+      if (recorder.isPaused) {
+        recorder.resume();
+        _isPaused = false;
+      } else {
+        recorder.pause();
+        _isPaused = true;
+      }
     });
   }
 
@@ -199,9 +219,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             _RecordBar(
               tapToRecordLabel: l10n.tapToRecord,
+              pausedLabel: l10n.paused,
+              pauseTooltip: _isPaused ? l10n.resume : l10n.pause,
               isRecording: _isRecording,
+              isPaused: _isPaused,
               elapsedLabel: formatDuration(_elapsed),
               onTap: _toggleRecording,
+              onTogglePause: _togglePause,
             ),
           ],
         ),
@@ -213,15 +237,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _RecordBar extends StatelessWidget {
   const _RecordBar({
     required this.tapToRecordLabel,
+    required this.pausedLabel,
+    required this.pauseTooltip,
     required this.isRecording,
+    required this.isPaused,
     required this.elapsedLabel,
     required this.onTap,
+    required this.onTogglePause,
   });
 
   final String tapToRecordLabel;
+  final String pausedLabel;
+  final String pauseTooltip;
   final bool isRecording;
+  final bool isPaused;
   final String elapsedLabel;
   final VoidCallback onTap;
+  final VoidCallback onTogglePause;
 
   @override
   Widget build(BuildContext context) {
@@ -240,10 +272,13 @@ class _RecordBar extends StatelessWidget {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const _RecPulse(),
+                      if (!isPaused) const _RecPulse(),
+                      if (isPaused)
+                        const Icon(Icons.pause_rounded,
+                            size: 14, color: AppTheme.textSecondary),
                       const SizedBox(width: 8),
                       Text(
-                        elapsedLabel,
+                        isPaused ? '$pausedLabel · $elapsedLabel' : elapsedLabel,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -262,7 +297,31 @@ class _RecordBar extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: 10),
-          RecordButton(isRecording: isRecording, onTap: onTap),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Pause sits beside the record button and only exists while
+              // recording, so the resting state stays a single obvious action.
+              SizedBox(
+                width: 56,
+                child: isRecording
+                    ? IconButton(
+                        onPressed: onTogglePause,
+                        tooltip: pauseTooltip,
+                        icon: Icon(
+                          isPaused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                          size: 26,
+                          color: AppTheme.textSecondary,
+                        ),
+                      )
+                    : null,
+              ),
+              RecordButton(isRecording: isRecording, onTap: onTap),
+              const SizedBox(width: 56),
+            ],
+          ),
         ],
       ),
     );

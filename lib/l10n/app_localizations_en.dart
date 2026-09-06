@@ -153,4 +153,85 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playbackFailed => 'Could not play this recording.';
+
+  @override
+  String get settingsTranscription => 'Transcription';
+
+  @override
+  String get settingsTranscriptionLanguage => 'Spoken language';
+
+  @override
+  String get settingsTranscriptionLanguageSubtitle =>
+      'Automatic detects the language of each phrase, so a conversation that switches language still transcribes correctly. Choose a language if the audio is always in one.';
+
+  @override
+  String get sttAuto => 'Automatic';
+
+  @override
+  String get sttMandarin => 'Mandarin Chinese';
+
+  @override
+  String get sttCantonese => 'Cantonese';
+
+  @override
+  String get sttEnglish => 'English';
+
+  @override
+  String get sttJapanese => 'Japanese';
+
+  @override
+  String get sttKorean => 'Korean';
+
+  @override
+  String detectedLanguages(String languages) {
+    return 'Detected: $languages';
+  }
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String get renameTitle => 'Rename recording';
+
+  @override
+  String get renameHint => 'Name';
+
+  @override
+  String get renameEmpty => 'Enter a name.';
+
+  @override
+  String get renameExists => 'A recording with that name already exists.';
+
+  @override
+  String get renameFailed => 'Could not rename the recording.';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get copyTranscript => 'Copy transcript';
+
+  @override
+  String get copied => 'Transcript copied.';
+
+  @override
+  String get share => 'Share';
+
+  @override
+  String get shareAudio => 'Share audio';
+
+  @override
+  String get shareTranscript => 'Share transcript';
+
+  @override
+  String get shareFailed => 'Could not share this recording.';
+
+  @override
+  String get pause => 'Pause';
+
+  @override
+  String get resume => 'Resume';
+
+  @override
+  String get paused => 'Paused';
 }

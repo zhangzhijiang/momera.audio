@@ -480,3 +480,65 @@ audio is not a decision it gets to make.
 The budget is computed at start as `cap - bytes already used`, and
 `RecordingRepository.totalBytes()` counts the in-progress `.pcm` too, so the
 accounting stays honest during a recording.
+
+
+---
+
+## Speech recognition: languages
+
+The model is `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`. It supports
+**five** languages and no others:
+
+| Code | Language |
+|---|---|
+| `zh` | Mandarin Chinese |
+| `yue` | Cantonese |
+| `en` | English |
+| `ja` | Japanese |
+| `ko` | Korean |
+
+The token vocabulary contains tags for many more languages (`es`, `de`, `fr`,
+…), inherited from the vocabulary the model was built on. **The checkpoint is
+not trained for them.** Do not read the vocabulary as a capability list.
+
+### ⚠️ Spanish is a UI language but not a transcription language
+
+The app UI ships in Spanish; the recogniser cannot transcribe Spanish. A Spanish
+speaker gets a Spanish interface and then cannot transcribe their own recordings.
+
+This is a genuine product mismatch, not a bug in the code. Options, none of them
+free:
+
+- Ship a second model for European languages (a much bigger download).
+- Say so plainly in the Spanish listing and in the app.
+- Drop Spanish from the UI languages.
+
+Recorded here so the decision is made deliberately rather than discovered by a
+reviewer.
+
+### Auto-detection is per speech segment
+
+`OfflineSenseVoiceModelConfig.language` defaults to `''`, which means detect.
+Because transcription runs Silero VAD first and decodes **each speech segment
+independently**, language identification also happens per segment — so a
+conversation that switches language between utterances transcribes correctly,
+each utterance in its own language.
+
+Within a single utterance that code-switches mid-sentence, one language wins;
+the vocabulary has `<|zh/en|>` tags for that case but the result carries one
+label per segment.
+
+The detected language comes back on `OfflineRecognizerResult.lang` (it was
+being discarded). It is now collected in first-seen order, persisted with the
+transcript, and shown on the recording tile — so a bilingual recording visibly
+lists both.
+
+The **Spoken language** setting pins the recogniser to one language instead.
+Changing it rebuilds the recogniser, because the language is baked in at
+construction.
+
+### Transcript sidecars are JSON
+
+Storing detected languages meant the `<name>.txt` sidecar became JSON
+(`{"text": ..., "languages": [...]}`). The reader still accepts the old
+plain-text form, so transcripts written before this change are not lost.

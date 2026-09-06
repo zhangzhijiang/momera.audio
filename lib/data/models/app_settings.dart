@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import '../../core/services/transcription_service.dart';
+
 /// The UI languages Momera.Audio ships.
 ///
 /// [system] follows the device language, falling back to English when the
@@ -32,6 +34,7 @@ class AppSettings {
     this.language = AppLanguage.system,
     this.maxStorageBytes = defaultMaxStorageBytes,
     this.autosaveInterval = defaultAutosaveInterval,
+    this.transcriptionLanguage = TranscriptionLanguage.auto,
   });
 
   /// 2 GB. Roughly 18 hours at 16 kHz mono PCM16 (~1.83 MB/minute), which is
@@ -62,15 +65,24 @@ class AppSettings {
   final int maxStorageBytes;
   final Duration autosaveInterval;
 
+  /// Which language the recogniser is told to expect. `auto` detects per
+  /// speech segment, which is what makes a conversation that switches language
+  /// transcribe correctly; pinning a language helps when content is known to
+  /// be monolingual.
+  final TranscriptionLanguage transcriptionLanguage;
+
   AppSettings copyWith({
     AppLanguage? language,
     int? maxStorageBytes,
     Duration? autosaveInterval,
+    TranscriptionLanguage? transcriptionLanguage,
   }) {
     return AppSettings(
       language: language ?? this.language,
       maxStorageBytes: maxStorageBytes ?? this.maxStorageBytes,
       autosaveInterval: autosaveInterval ?? this.autosaveInterval,
+      transcriptionLanguage:
+          transcriptionLanguage ?? this.transcriptionLanguage,
     );
   }
 
@@ -79,8 +91,14 @@ class AppSettings {
       other is AppSettings &&
       other.language == language &&
       other.maxStorageBytes == maxStorageBytes &&
-      other.autosaveInterval == autosaveInterval;
+      other.autosaveInterval == autosaveInterval &&
+      other.transcriptionLanguage == transcriptionLanguage;
 
   @override
-  int get hashCode => Object.hash(language, maxStorageBytes, autosaveInterval);
+  int get hashCode => Object.hash(
+        language,
+        maxStorageBytes,
+        autosaveInterval,
+        transcriptionLanguage,
+      );
 }

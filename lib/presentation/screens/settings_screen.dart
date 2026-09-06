@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/transcription_service.dart';
 import '../../core/utils/app_theme.dart';
 import '../../data/models/app_settings.dart';
 import '../../l10n/app_localizations.dart';
@@ -58,6 +59,22 @@ class SettingsScreen extends ConsumerWidget {
               selected: settings.maxStorageBytes,
               labelFor: formatBytes,
               onSelected: notifier.setMaxStorageBytes,
+            ),
+          ),
+
+          _SectionHeader(l10n.settingsTranscription),
+          _SettingTile(
+            title: l10n.settingsTranscriptionLanguage,
+            subtitle: l10n.settingsTranscriptionLanguageSubtitle,
+            value: transcriptionLanguageLabel(
+                l10n, settings.transcriptionLanguage),
+            onTap: () => _pickFromList<TranscriptionLanguage>(
+              context: context,
+              title: l10n.settingsTranscriptionLanguage,
+              options: TranscriptionLanguage.values,
+              selected: settings.transcriptionLanguage,
+              labelFor: (t) => transcriptionLanguageLabel(l10n, t),
+              onSelected: notifier.setTranscriptionLanguage,
             ),
           ),
 
@@ -173,6 +190,31 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (chosen != null) onSelected(chosen);
+  }
+}
+
+/// Display name for a speech-recognition language.
+///
+/// These are the five the SenseVoice checkpoint actually supports. Note that
+/// Spanish is a UI language but **not** a transcription language — the model is
+/// not trained for it.
+String transcriptionLanguageLabel(
+  AppLocalizations l10n,
+  TranscriptionLanguage language,
+) {
+  switch (language) {
+    case TranscriptionLanguage.auto:
+      return l10n.sttAuto;
+    case TranscriptionLanguage.mandarin:
+      return l10n.sttMandarin;
+    case TranscriptionLanguage.cantonese:
+      return l10n.sttCantonese;
+    case TranscriptionLanguage.english:
+      return l10n.sttEnglish;
+    case TranscriptionLanguage.japanese:
+      return l10n.sttJapanese;
+    case TranscriptionLanguage.korean:
+      return l10n.sttKorean;
   }
 }
 

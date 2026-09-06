@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/services/transcription_service.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/duration_format.dart';
 import '../../data/models/recording.dart';
+import '../../data/repositories/recording_repository.dart';
+import '../screens/settings_screen.dart' show transcriptionLanguageLabel;
 import '../../l10n/app_localizations.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
+import '../providers/settings_provider.dart';
 import 'model_download_sheet.dart';
 
 /// A single recording row: play/pause, metadata, transcript, and actions.
@@ -76,16 +81,19 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
       _progress = 0;
     });
     try {
-      final text = await service.transcribeFile(
+      final result = await service.transcribeFile(
         _recording.path,
+        language: ref.read(settingsProvider).transcriptionLanguage,
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
       );
-      await ref
-          .read(recordingsProvider.notifier)
-          .setTranscript(_recording, text);
-      if (mounted && text.isEmpty) {
+      await ref.read(recordingsProvider.notifier).setTranscript(
+            _recording,
+            result.text,
+            languages: result.languages,
+          );
+      if (mounted && result.isEmpty) {
         _showSnack(l10n.noSpeechDetected);
       }
     } on ModelNotReadyException {
@@ -127,6 +135,98 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _rename() async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller =
+        TextEditingController(text: _recording.customName ?? _recording.baseName);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.renameTitle),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l10n.renameHint),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null) return;
+
+    if (RecordingRepository.sanitizeFileName(newName).isEmpty) {
+      if (mounted) _showSnack(l10n.renameEmpty);
+      return;
+    }
+    try {
+      await ref.read(recordingsProvider.notifier).rename(_recording, newName);
+    } on RenameCollisionException {
+      if (mounted) _showSnack(l10n.renameExists);
+    } catch (_) {
+      if (mounted) _showSnack(l10n.renameFailed);
+    }
+  }
+
+  Future<void> _copyTranscript() async {
+    final l10n = AppLocalizations.of(context)!;
+    await Clipboard.setData(ClipboardData(text: _recording.transcript ?? ''));
+    if (mounted) _showSnack(l10n.copied);
+  }
+
+  /// The share sheet needs an anchor rect on iPad, where it is presented as a
+  /// popover rather than a modal. Harmless elsewhere.
+  Rect? _shareOrigin() {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  String get _shareSubject =>
+      _recording.customName ?? formatCreatedAt(_recording.createdAt);
+
+  Future<void> _shareAudio() async {
+    final l10n = AppLocalizations.of(context)!;
+    final origin = _shareOrigin();
+    try {
+      await Share.shareXFiles(
+        [XFile(_recording.path, mimeType: 'audio/wav')],
+        subject: _shareSubject,
+        sharePositionOrigin: origin,
+      );
+    } catch (_) {
+      if (mounted) _showSnack(l10n.shareFailed);
+    }
+  }
+
+  Future<void> _shareTranscript() async {
+    final l10n = AppLocalizations.of(context)!;
+    final text = _recording.transcript?.trim() ?? '';
+    // Share.share asserts on empty text, so an untranscribed recording must
+    // never reach it.
+    if (text.isEmpty) return;
+    final origin = _shareOrigin();
+    try {
+      await Share.share(
+        text,
+        subject: _shareSubject,
+        sharePositionOrigin: origin,
+      );
+    } catch (_) {
+      if (mounted) _showSnack(l10n.shareFailed);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final playback = ref.watch(audioPlaybackServiceProvider);
@@ -164,7 +264,9 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      formatCreatedAt(r.createdAt),
+                      r.customName ?? formatCreatedAt(r.createdAt),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -173,7 +275,14 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      formatDuration(r.duration),
+                      // A renamed recording still needs its timestamp shown,
+                      // since the name has replaced it above.
+                      r.customName == null
+                          ? formatDuration(r.duration)
+                          : '${formatCreatedAt(r.createdAt)} · '
+                              '${formatDuration(r.duration)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -182,15 +291,97 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline_rounded,
+              PopupMenuButton<_TileAction>(
+                icon: const Icon(Icons.more_horiz_rounded,
                     size: 20, color: AppTheme.textHint),
-                onPressed: _confirmDelete,
-                tooltip: AppLocalizations.of(context)!.delete,
+                tooltip: null,
+                onSelected: (action) {
+                  switch (action) {
+                    case _TileAction.rename:
+                      _rename();
+                    case _TileAction.copyTranscript:
+                      _copyTranscript();
+                    case _TileAction.shareAudio:
+                      _shareAudio();
+                    case _TileAction.shareTranscript:
+                      _shareTranscript();
+                    case _TileAction.delete:
+                      _confirmDelete();
+                  }
+                },
+                itemBuilder: (context) {
+                  final l10n = AppLocalizations.of(context)!;
+                  return [
+                    PopupMenuItem(
+                      value: _TileAction.rename,
+                      child: _menuRow(Icons.edit_outlined, l10n.rename),
+                    ),
+                    PopupMenuItem(
+                      value: _TileAction.shareAudio,
+                      child: _menuRow(Icons.ios_share_rounded, l10n.shareAudio),
+                    ),
+                    // Transcript actions only make sense once there is one.
+                    if (r.hasTranscript) ...[
+                      PopupMenuItem(
+                        value: _TileAction.copyTranscript,
+                        child: _menuRow(
+                            Icons.copy_all_outlined, l10n.copyTranscript),
+                      ),
+                      PopupMenuItem(
+                        value: _TileAction.shareTranscript,
+                        child: _menuRow(
+                            Icons.text_snippet_outlined, l10n.shareTranscript),
+                      ),
+                    ],
+                    PopupMenuItem(
+                      value: _TileAction.delete,
+                      child: _menuRow(
+                        Icons.delete_outline_rounded,
+                        l10n.delete,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ];
+                },
               ),
             ],
           ),
           if (r.hasTranscript) ...[
+            // Which languages the recogniser heard. Worth surfacing because the
+            // model detects per phrase, so a bilingual conversation lists more
+            // than one.
+            if (r.languages.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    r.isMultilingual
+                        ? Icons.translate_rounded
+                        : Icons.language_rounded,
+                    size: 14,
+                    color: AppTheme.textHint,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(context)!.detectedLanguages(
+                        [
+                          for (final l in r.languages)
+                            transcriptionLanguageLabel(
+                                AppLocalizations.of(context)!, l)
+                        ].join(' · '),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textHint,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -265,4 +456,18 @@ class _RoundIconButton extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// Overflow-menu actions on a recording.
+enum _TileAction { rename, shareAudio, copyTranscript, shareTranscript, delete }
+
+Widget _menuRow(IconData icon, String label, {Color? color}) {
+  return Row(
+    children: [
+      Icon(icon, size: 18, color: color ?? AppTheme.textSecondary),
+      const SizedBox(width: 10),
+      Text(label, style: TextStyle(fontSize: 14, color: color)),
+    ],
+  );
 }

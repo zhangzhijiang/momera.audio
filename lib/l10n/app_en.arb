@@ -91,5 +91,38 @@
       }
     }
   },
-  "playbackFailed": "Could not play this recording."
+  "playbackFailed": "Could not play this recording.",
+  "settingsTranscription": "Transcription",
+  "settingsTranscriptionLanguage": "Spoken language",
+  "settingsTranscriptionLanguageSubtitle": "Automatic detects the language of each phrase, so a conversation that switches language still transcribes correctly. Choose a language if the audio is always in one.",
+  "sttAuto": "Automatic",
+  "sttMandarin": "Mandarin Chinese",
+  "sttCantonese": "Cantonese",
+  "sttEnglish": "English",
+  "sttJapanese": "Japanese",
+  "sttKorean": "Korean",
+  "detectedLanguages": "Detected: {languages}",
+  "@detectedLanguages": {
+    "placeholders": {
+      "languages": {
+        "type": "String"
+      }
+    }
+  },
+  "rename": "Rename",
+  "renameTitle": "Rename recording",
+  "renameHint": "Name",
+  "renameEmpty": "Enter a name.",
+  "renameExists": "A recording with that name already exists.",
+  "renameFailed": "Could not rename the recording.",
+  "save": "Save",
+  "copyTranscript": "Copy transcript",
+  "copied": "Transcript copied.",
+  "share": "Share",
+  "shareAudio": "Share audio",
+  "shareTranscript": "Share transcript",
+  "shareFailed": "Could not share this recording.",
+  "pause": "Pause",
+  "resume": "Resume",
+  "paused": "Paused"
 }

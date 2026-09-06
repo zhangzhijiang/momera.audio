@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/transcription_service.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/repositories/settings_repository.dart';
 import 'recordings_provider.dart';
@@ -39,6 +40,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   Future<void> setAutosaveInterval(Duration interval) =>
       _update(state.copyWith(autosaveInterval: interval));
+
+  Future<void> setTranscriptionLanguage(TranscriptionLanguage language) =>
+      _update(state.copyWith(transcriptionLanguage: language));
 
   Future<void> _update(AppSettings next) async {
     state = next;

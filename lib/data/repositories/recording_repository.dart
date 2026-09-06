@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/services/transcription_service.dart';
 import '../models/recording.dart';
 
 /// Filesystem-backed store for [Recording]s.
@@ -44,14 +46,15 @@ class RecordingRepository {
       if (p.extension(entry.path).toLowerCase() != '.wav') continue;
 
       final stat = await entry.stat();
-      final transcript = await _readTranscript(entry.path);
+      final sidecar = await _readTranscript(entry.path);
       recordings.add(
         Recording(
           path: entry.path,
           createdAt: _parseTimestamp(entry.path) ?? stat.modified,
           sizeBytes: stat.size,
           duration: _durationForWavBytes(stat.size),
-          transcript: transcript,
+          transcript: sidecar?.text,
+          languages: sidecar?.languages ?? const [],
         ),
       );
     }
@@ -76,6 +79,54 @@ class RecordingRepository {
     return total;
   }
 
+  /// Rename a recording, moving its transcript sidecar with it.
+  ///
+  /// [newBaseName] is a display name without an extension. Returns the new
+  /// `.wav` path.
+  ///
+  /// Throws [RenameCollisionException] if the target already exists — silently
+  /// overwriting would destroy another recording.
+  Future<String> rename(Recording recording, String newBaseName) async {
+    final sanitized = sanitizeFileName(newBaseName);
+    if (sanitized.isEmpty) {
+      throw ArgumentError.value(newBaseName, 'newBaseName', 'empty after sanitizing');
+    }
+
+    final dir = p.dirname(recording.path);
+    final target = p.join(dir, '$sanitized.wav');
+    if (target == recording.path) return recording.path;
+    if (await File(target).exists()) {
+      throw const RenameCollisionException();
+    }
+
+    await File(recording.path).rename(target);
+
+    // Carry the transcript across so renaming never loses it.
+    final oldSidecar = File(_transcriptPath(recording.path));
+    if (await oldSidecar.exists()) {
+      await oldSidecar.rename(_transcriptPath(target));
+    }
+    return target;
+  }
+
+  /// Strips characters that are illegal or awkward in a filename on any of the
+  /// platforms this app runs on, and trims to a sane length.
+  static String sanitizeFileName(String input) {
+    final cleaned = input
+        .trim()
+        // Path separators and characters Windows/macOS reject outright.
+        .replaceAll(RegExp(r'[/\\:*?"<>|]'), '')
+        // Control characters.
+        .replaceAll(RegExp(r'[\x00-\x1F]'), '')
+        // Collapse whitespace runs.
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim()
+        // A leading dot hides the file on Unix.
+        .replaceFirst(RegExp(r'^\.+'), '')
+        .trim();
+    return cleaned.length > 100 ? cleaned.substring(0, 100).trim() : cleaned;
+  }
+
   /// Delete a recording's audio file and its transcript sidecar.
   Future<void> delete(Recording recording) async {
     final audio = File(recording.path);
@@ -84,9 +135,21 @@ class RecordingRepository {
     if (await sidecar.exists()) await sidecar.delete();
   }
 
-  /// Persist (or overwrite) the transcript for a recording.
-  Future<void> saveTranscript(String audioPath, String text) async {
-    await File(_transcriptPath(audioPath)).writeAsString(text);
+  /// Persist (or overwrite) the transcript for a recording, together with the
+  /// languages the recogniser detected.
+  ///
+  /// Written as JSON. Sidecars written before languages were tracked are plain
+  /// text, and [_readTranscript] still reads those.
+  Future<void> saveTranscript(
+    String audioPath,
+    String text, {
+    List<TranscriptionLanguage> languages = const [],
+  }) async {
+    final payload = jsonEncode({
+      'text': text,
+      'languages': [for (final l in languages) l.name],
+    });
+    await File(_transcriptPath(audioPath)).writeAsString(payload);
   }
 
   // --- helpers --------------------------------------------------------------
@@ -94,11 +157,33 @@ class RecordingRepository {
   String _transcriptPath(String audioPath) =>
       p.setExtension(audioPath, '.txt');
 
-  Future<String?> _readTranscript(String audioPath) async {
+  /// Reads a transcript sidecar.
+  ///
+  /// Handles both the current JSON form and the plain-text form written before
+  /// detected languages were stored, so an existing transcript is never lost to
+  /// a format change.
+  Future<_TranscriptSidecar?> _readTranscript(String audioPath) async {
     final file = File(_transcriptPath(audioPath));
     if (!await file.exists()) return null;
-    final text = await file.readAsString();
-    return text.trim().isEmpty ? null : text;
+
+    final raw = await file.readAsString();
+    if (raw.trim().isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        final text = decoded['text'] as String? ?? '';
+        if (text.trim().isEmpty) return null;
+        final languages = <TranscriptionLanguage>[
+          for (final name in (decoded['languages'] as List? ?? const []))
+            TranscriptionLanguage.fromName(name as String?),
+        ];
+        return _TranscriptSidecar(text, languages);
+      }
+    } on FormatException {
+      // Not JSON — a legacy plain-text sidecar.
+    }
+    return _TranscriptSidecar(raw, const []);
   }
 
   /// Derive duration from the WAV byte length for our fixed recording format.
@@ -121,4 +206,20 @@ class RecordingRepository {
       'T${t.substring(0, 2)}:${t.substring(2, 4)}:${t.substring(4, 6)}',
     );
   }
+}
+
+
+/// Thrown when renaming would overwrite an existing recording.
+class RenameCollisionException implements Exception {
+  const RenameCollisionException();
+  @override
+  String toString() => 'A recording with that name already exists.';
+}
+
+/// Parsed contents of a transcript sidecar.
+class _TranscriptSidecar {
+  const _TranscriptSidecar(this.text, this.languages);
+
+  final String text;
+  final List<TranscriptionLanguage> languages;
 }

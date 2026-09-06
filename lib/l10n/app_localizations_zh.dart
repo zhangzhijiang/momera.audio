@@ -148,6 +148,87 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playbackFailed => '无法播放这段录音。';
+
+  @override
+  String get settingsTranscription => '转写';
+
+  @override
+  String get settingsTranscriptionLanguage => '说话语言';
+
+  @override
+  String get settingsTranscriptionLanguageSubtitle =>
+      '自动识别会逐句判断语言，因此对话中途切换语言也能正确转写。如果录音始终是同一种语言，可以直接指定。';
+
+  @override
+  String get sttAuto => '自动识别';
+
+  @override
+  String get sttMandarin => '普通话';
+
+  @override
+  String get sttCantonese => '粤语';
+
+  @override
+  String get sttEnglish => '英语';
+
+  @override
+  String get sttJapanese => '日语';
+
+  @override
+  String get sttKorean => '韩语';
+
+  @override
+  String detectedLanguages(String languages) {
+    return '识别到：$languages';
+  }
+
+  @override
+  String get rename => '重命名';
+
+  @override
+  String get renameTitle => '重命名录音';
+
+  @override
+  String get renameHint => '名称';
+
+  @override
+  String get renameEmpty => '请输入名称。';
+
+  @override
+  String get renameExists => '已存在同名的录音。';
+
+  @override
+  String get renameFailed => '无法重命名该录音。';
+
+  @override
+  String get save => '保存';
+
+  @override
+  String get copyTranscript => '复制转写文字';
+
+  @override
+  String get copied => '已复制转写文字。';
+
+  @override
+  String get share => '分享';
+
+  @override
+  String get shareAudio => '分享音频';
+
+  @override
+  String get shareTranscript => '分享转写文字';
+
+  @override
+  String get shareFailed => '无法分享这段录音。';
+
+  @override
+  String get pause => '暂停';
+
+  @override
+  String get resume => '继续';
+
+  @override
+  String get paused => '已暂停';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -294,4 +375,85 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get playbackFailed => '無法播放這段錄音。';
+
+  @override
+  String get settingsTranscription => '轉寫';
+
+  @override
+  String get settingsTranscriptionLanguage => '說話語言';
+
+  @override
+  String get settingsTranscriptionLanguageSubtitle =>
+      '自動辨識會逐句判斷語言，因此對話中途切換語言也能正確轉寫。如果錄音始終是同一種語言，可以直接指定。';
+
+  @override
+  String get sttAuto => '自動辨識';
+
+  @override
+  String get sttMandarin => '普通話';
+
+  @override
+  String get sttCantonese => '粵語';
+
+  @override
+  String get sttEnglish => '英語';
+
+  @override
+  String get sttJapanese => '日語';
+
+  @override
+  String get sttKorean => '韓語';
+
+  @override
+  String detectedLanguages(String languages) {
+    return '辨識到：$languages';
+  }
+
+  @override
+  String get rename => '重新命名';
+
+  @override
+  String get renameTitle => '重新命名錄音';
+
+  @override
+  String get renameHint => '名稱';
+
+  @override
+  String get renameEmpty => '請輸入名稱。';
+
+  @override
+  String get renameExists => '已存在同名的錄音。';
+
+  @override
+  String get renameFailed => '無法重新命名這段錄音。';
+
+  @override
+  String get save => '儲存';
+
+  @override
+  String get copyTranscript => '複製轉寫文字';
+
+  @override
+  String get copied => '已複製轉寫文字。';
+
+  @override
+  String get share => '分享';
+
+  @override
+  String get shareAudio => '分享音訊';
+
+  @override
+  String get shareTranscript => '分享轉寫文字';
+
+  @override
+  String get shareFailed => '無法分享這段錄音。';
+
+  @override
+  String get pause => '暫停';
+
+  @override
+  String get resume => '繼續';
+
+  @override
+  String get paused => '已暫停';
 }

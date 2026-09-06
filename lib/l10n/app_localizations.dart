@@ -346,6 +346,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not play this recording.'**
   String get playbackFailed;
+
+  /// No description provided for @settingsTranscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription'**
+  String get settingsTranscription;
+
+  /// No description provided for @settingsTranscriptionLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Spoken language'**
+  String get settingsTranscriptionLanguage;
+
+  /// No description provided for @settingsTranscriptionLanguageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic detects the language of each phrase, so a conversation that switches language still transcribes correctly. Choose a language if the audio is always in one.'**
+  String get settingsTranscriptionLanguageSubtitle;
+
+  /// No description provided for @sttAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get sttAuto;
+
+  /// No description provided for @sttMandarin.
+  ///
+  /// In en, this message translates to:
+  /// **'Mandarin Chinese'**
+  String get sttMandarin;
+
+  /// No description provided for @sttCantonese.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantonese'**
+  String get sttCantonese;
+
+  /// No description provided for @sttEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get sttEnglish;
+
+  /// No description provided for @sttJapanese.
+  ///
+  /// In en, this message translates to:
+  /// **'Japanese'**
+  String get sttJapanese;
+
+  /// No description provided for @sttKorean.
+  ///
+  /// In en, this message translates to:
+  /// **'Korean'**
+  String get sttKorean;
+
+  /// No description provided for @detectedLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'Detected: {languages}'**
+  String detectedLanguages(String languages);
+
+  /// No description provided for @rename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// No description provided for @renameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename recording'**
+  String get renameTitle;
+
+  /// No description provided for @renameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get renameHint;
+
+  /// No description provided for @renameEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get renameEmpty;
+
+  /// No description provided for @renameExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A recording with that name already exists.'**
+  String get renameExists;
+
+  /// No description provided for @renameFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not rename the recording.'**
+  String get renameFailed;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @copyTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy transcript'**
+  String get copyTranscript;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript copied.'**
+  String get copied;
+
+  /// No description provided for @share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get share;
+
+  /// No description provided for @shareAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Share audio'**
+  String get shareAudio;
+
+  /// No description provided for @shareTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Share transcript'**
+  String get shareTranscript;
+
+  /// No description provided for @shareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not share this recording.'**
+  String get shareFailed;
+
+  /// No description provided for @pause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get pause;
+
+  /// No description provided for @resume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get resume;
+
+  /// No description provided for @paused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get paused;
 }
 
 class _AppLocalizationsDelegate

@@ -30,6 +30,7 @@ dependencies:
   http: ^1.2.0 # downloads the SenseVoice model at runtime
   intl: ^0.20.2
   shared_preferences: ^2.3.2 # persists the settings screen's choices
+  share_plus: ^10.1.2 # share recordings and transcripts to other apps
 
 dev_dependencies:
   flutter_test:

@@ -18,6 +18,12 @@ class MlKitTranslator implements Translator {
   @override
   String get id => 'mlkit';
 
+  /// One native translator is cached per language pair and reused, so repeated
+  /// calls are cheap — which makes this the engine of choice for live,
+  /// per-utterance translation.
+  @override
+  bool get isReusable => true;
+
   final OnDeviceTranslatorModelManager _models =
       OnDeviceTranslatorModelManager();
 

@@ -86,6 +86,19 @@ class AudioRecordingService {
   /// arriving from the platform is discarded until [resume].
   bool get isPaused => _isPaused;
 
+  /// Optional tap on the recorded audio, for live transcription.
+  ///
+  /// Called with a copy of each chunk actually written, plus that chunk's byte
+  /// offset from the start of the recording. Set it to start observing and
+  /// null it to stop; when null there is no extra work per chunk at all, which
+  /// is what keeps live transcription's cost bounded to the moment the user is
+  /// holding the button.
+  ///
+  /// Never called while paused, and never called with audio beyond the storage
+  /// cap. Implementations must return promptly: this runs inside the audio
+  /// stream's chunk handler, and time spent here delays the next chunk's write.
+  void Function(Uint8List pcm, int byteOffset)? onLiveAudio;
+
   /// Bytes of audio captured in the current recording.
   int get bytesWritten => _bytesWritten;
 
@@ -209,9 +222,23 @@ class AudioRecordingService {
     // overshooting by up to one buffer.
     final toWrite =
         chunk.length <= remaining ? chunk : Uint8List.sublistView(chunk, 0, remaining);
+    final offsetBefore = _bytesWritten;
     _sink?.add(toWrite);
     _bytesWritten += toWrite.length;
     _session.updateElapsed(elapsed);
+
+    // Live transcription tee. Deliberately last, and deliberately fed the
+    // trimmed `toWrite` rather than `chunk` — feeding `chunk` would transcribe
+    // audio past the storage cap that was never recorded.
+    //
+    // The listener must not touch the sink or _bytesWritten: those are the only
+    // source of truth for elapsed time, the cap, and the final duration. It is
+    // handed a *copy* because `Uint8List.sublistView` is a view onto the
+    // plugin's buffer, and holding it would retain the whole underlying chunk.
+    final live = onLiveAudio;
+    if (live != null && toWrite.isNotEmpty) {
+      live(Uint8List.fromList(toWrite), offsetBefore);
+    }
 
     if (_bytesWritten >= _byteBudget) {
       _finish(RecordingStopReason.storageFull, onStopped);

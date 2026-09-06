@@ -9,9 +9,11 @@ import '../../core/services/recording_session_channel.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/duration_format.dart';
 import '../../l10n/app_localizations.dart';
+import '../providers/live_transcript_provider.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/live_transcript_panel.dart';
 import '../widgets/record_button.dart';
 import '../widgets/recording_tile.dart';
 import 'settings_screen.dart';
@@ -25,6 +27,12 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+
+  /// Held while a live pass is running so it can be torn down without `ref`,
+  /// which is not usable once this widget starts unmounting.
+  AudioRecordingService? _liveRecorder;
+  LiveTranscriptNotifier? _liveNotifier;
+
   bool _isRecording = false;
   bool _isPaused = false;
   Duration _elapsed = Duration.zero;
@@ -44,6 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _stopLive();
     _searchController.dispose();
     RecordingSessionChannel.setStopRequestedHandler(null);
     super.dispose();
@@ -92,6 +101,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       return;
     }
+    // A new recording starts with an empty live panel.
+    ref.read(liveTranscriptProvider.notifier).reset();
     setState(() {
       _isRecording = true;
       _isPaused = false;
@@ -101,6 +112,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       setState(() => _elapsed = recorder.elapsed);
     });
+  }
+
+  /// Start live transcription — the user has pressed and is holding the live
+  /// button.
+  ///
+  /// The hold is what bounds the cost: audio is only tapped, and utterances only
+  /// decoded, while the finger is down. Nothing extra runs otherwise, which is
+  /// why this feature does not need a background-battery story.
+  Future<void> _startLive() async {
+    final recorder = ref.read(audioRecordingServiceProvider);
+    if (!recorder.isRecording) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final notifier = ref.read(liveTranscriptProvider.notifier);
+
+    final started = await notifier.start(fromByteOffset: recorder.bytesWritten);
+    if (!started) {
+      if (!mounted) return;
+      // Two reasons it can fail, and they need different advice.
+      final busy = ref.read(transcriptionServiceProvider).isBusy;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(busy ? l10n.liveBusy : l10n.liveUnavailable)),
+      );
+      return;
+    }
+
+    // Tap the recorded audio only now, so there is zero per-chunk work when
+    // live transcription is not running.
+    recorder.onLiveAudio = (pcm, _) => notifier.feed(pcm);
+
+    // Held directly rather than re-read through `ref` on the way out: teardown
+    // can happen while this widget is unmounting, and failing to release then
+    // would strand the shared recogniser for the rest of the session.
+    _liveRecorder = recorder;
+    _liveNotifier = notifier;
+  }
+
+  /// The live button was released, or recording ended under it.
+  ///
+  /// Reached from several directions — button release, recording ending under a
+  /// held finger, and the hold button being disposed mid-press — so it must be
+  /// safe to call repeatedly and while tearing down. Failing to release here
+  /// would strand the shared recogniser and block the post-recording
+  /// Transcribe for the rest of the session.
+  void _stopLive() {
+    _liveRecorder?.onLiveAudio = null;
+    _liveNotifier?.stop();
+    _liveRecorder = null;
+    _liveNotifier = null;
   }
 
   /// The recording ended without the user tapping stop — the storage cap was
@@ -119,6 +179,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onRecordingEnded() {
     _timer?.cancel();
     _timer = null;
+    // Recording can end under a held finger — cap reached, interruption, or the
+    // notification's Stop action — so the live pass must be torn down here too,
+    // not only on button release. Leaving it running would hold the shared
+    // recogniser and block the post-recording Transcribe.
+    _stopLive();
     if (!mounted) return;
     setState(() {
       _isRecording = false;
@@ -262,15 +327,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 },
               ),
             ),
+            // Live panel sits between the list and the record bar, and only
+            // exists while recording. It watches its own provider so a new
+            // utterance does not rebuild the list above it.
+            if (_isRecording) const LiveTranscriptPanel(),
             _RecordBar(
               tapToRecordLabel: l10n.tapToRecord,
               pausedLabel: l10n.paused,
               pauseTooltip: _isPaused ? l10n.resume : l10n.pause,
+              liveTooltip: l10n.liveHold,
               isRecording: _isRecording,
               isPaused: _isPaused,
               elapsedLabel: formatDuration(_elapsed),
               onTap: _toggleRecording,
               onTogglePause: _togglePause,
+              onLivePressed: _startLive,
+              onLiveReleased: _stopLive,
             ),
           ],
         ),
@@ -284,21 +356,27 @@ class _RecordBar extends StatelessWidget {
     required this.tapToRecordLabel,
     required this.pausedLabel,
     required this.pauseTooltip,
+    required this.liveTooltip,
     required this.isRecording,
     required this.isPaused,
     required this.elapsedLabel,
     required this.onTap,
     required this.onTogglePause,
+    required this.onLivePressed,
+    required this.onLiveReleased,
   });
 
   final String tapToRecordLabel;
   final String pausedLabel;
   final String pauseTooltip;
+  final String liveTooltip;
   final bool isRecording;
   final bool isPaused;
   final String elapsedLabel;
   final VoidCallback onTap;
   final VoidCallback onTogglePause;
+  final VoidCallback onLivePressed;
+  final VoidCallback onLiveReleased;
 
   @override
   Widget build(BuildContext context) {
@@ -364,7 +442,19 @@ class _RecordBar extends StatelessWidget {
                     : null,
               ),
               RecordButton(isRecording: isRecording, onTap: onTap),
-              const SizedBox(width: 56),
+              // Hold-to-transcribe. A hold rather than a toggle because it
+              // bounds the extra CPU work to exactly as long as the user wants
+              // to watch — releasing stops decoding immediately.
+              SizedBox(
+                width: 56,
+                child: isRecording
+                    ? _LiveHoldButton(
+                        tooltip: liveTooltip,
+                        onPressed: onLivePressed,
+                        onReleased: onLiveReleased,
+                      )
+                    : null,
+              ),
             ],
           ),
         ],
@@ -420,6 +510,80 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+
+/// Press-and-hold control that runs live transcription only while held.
+///
+/// Uses raw pointer callbacks rather than a button's `onPressed` so the release
+/// is detected wherever the finger goes — `onTapUp` alone would miss a drag off
+/// the button, leaving the recogniser running with nothing showing it.
+class _LiveHoldButton extends StatefulWidget {
+  const _LiveHoldButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.onReleased,
+  });
+
+  final String tooltip;
+  final VoidCallback onPressed;
+  final VoidCallback onReleased;
+
+  @override
+  State<_LiveHoldButton> createState() => _LiveHoldButtonState();
+}
+
+class _LiveHoldButtonState extends State<_LiveHoldButton> {
+  bool _held = false;
+
+  void _press() {
+    if (_held) return;
+    setState(() => _held = true);
+    widget.onPressed();
+  }
+
+  void _release() {
+    if (!_held) return;
+    setState(() => _held = false);
+    widget.onReleased();
+  }
+
+  @override
+  void dispose() {
+    // Navigating away mid-hold must not strand the live pass.
+    if (_held) widget.onReleased();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Deliberately no Tooltip: a tooltip fires on long-press, which is exactly
+    // the gesture that operates this control, so it would pop up over the UI
+    // every single time the button is used. The panel header above already
+    // carries the "hold for live text" affordance.
+    return Semantics(
+      button: true,
+      label: widget.tooltip,
+      child: Listener(
+        onPointerDown: (_) => _press(),
+        onPointerUp: (_) => _release(),
+        onPointerCancel: (_) => _release(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _held ? AppTheme.accentLight : Colors.transparent,
+          ),
+          child: Icon(
+            Icons.subtitles_rounded,
+            size: 24,
+            color: _held ? AppTheme.accent : AppTheme.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Search field pinned above the recording list.
 class _SearchField extends StatelessWidget {

@@ -304,4 +304,25 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get langCantonese => '広東語';
+
+  @override
+  String get liveHold => '長押しでリアルタイム表示';
+
+  @override
+  String get liveListening => '認識中…';
+
+  @override
+  String get liveStarting => '起動中…';
+
+  @override
+  String get liveEmpty => 'ボタンを長押しして話してください。一文ごとに文字が表示されます。';
+
+  @override
+  String get liveUnavailable => 'リアルタイム表示には音声モデルのダウンロードが必要です。';
+
+  @override
+  String get liveBusy => '実行中の文字起こしが終わるまでお待ちください。';
+
+  @override
+  String get liveTranslateOff => '翻訳しない';
 }

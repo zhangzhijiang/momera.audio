@@ -303,6 +303,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get langCantonese => '粤语';
+
+  @override
+  String get liveHold => '按住实时转写';
+
+  @override
+  String get liveListening => '正在聆听…';
+
+  @override
+  String get liveStarting => '正在启动…';
+
+  @override
+  String get liveEmpty => '按住按钮说话，每说完一句就会显示文字。';
+
+  @override
+  String get liveUnavailable => '请先下载语音模型才能使用实时转写。';
+
+  @override
+  String get liveBusy => '请先完成正在进行的转写。';
+
+  @override
+  String get liveTranslateOff => '不翻译';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -604,4 +625,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get langCantonese => '粵語';
+
+  @override
+  String get liveHold => '按住即時轉寫';
+
+  @override
+  String get liveListening => '正在聆聽…';
+
+  @override
+  String get liveStarting => '正在啟動…';
+
+  @override
+  String get liveEmpty => '按住按鈕說話，每說完一句就會顯示文字。';
+
+  @override
+  String get liveUnavailable => '請先下載語音模型才能使用即時轉寫。';
+
+  @override
+  String get liveBusy => '請先完成正在進行的轉寫。';
+
+  @override
+  String get liveTranslateOff => '不翻譯';
 }

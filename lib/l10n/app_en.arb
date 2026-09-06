@@ -166,5 +166,12 @@
   "langChineseTraditional": "Chinese (Traditional)",
   "langJapanese": "Japanese",
   "langKorean": "Korean",
-  "langCantonese": "Cantonese"
+  "langCantonese": "Cantonese",
+  "liveHold": "Hold for live text",
+  "liveListening": "Listening…",
+  "liveStarting": "Starting…",
+  "liveEmpty": "Hold the button and speak — text appears as you finish each phrase.",
+  "liveUnavailable": "Download the voice model first to use live text.",
+  "liveBusy": "Finish the transcription in progress first.",
+  "liveTranslateOff": "No translation"
 }

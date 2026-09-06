@@ -305,4 +305,25 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get langCantonese => '광둥어';
+
+  @override
+  String get liveHold => '길게 눌러 실시간 표시';
+
+  @override
+  String get liveListening => '듣는 중…';
+
+  @override
+  String get liveStarting => '시작하는 중…';
+
+  @override
+  String get liveEmpty => '버튼을 길게 누르고 말하세요. 한 문장이 끝날 때마다 텍스트가 표시됩니다.';
+
+  @override
+  String get liveUnavailable => '실시간 표시를 사용하려면 먼저 음성 모델을 다운로드하세요.';
+
+  @override
+  String get liveBusy => '진행 중인 텍스트 변환을 먼저 끝내세요.';
+
+  @override
+  String get liveTranslateOff => '번역 안 함';
 }

@@ -38,8 +38,14 @@ class TranslationService {
   }
 
   /// Which engine would handle [to], or null if nothing can.
-  Future<Translator?> engineFor(TranslationLanguage to) =>
-      _registry.engineFor(to);
+  ///
+  /// [preferReusable] biases towards engines that keep their native machinery
+  /// open across calls, which matters when translating utterance by utterance.
+  Future<Translator?> engineFor(
+    TranslationLanguage to, {
+    bool preferReusable = false,
+  }) =>
+      _registry.engineFor(to, preferReusable: preferReusable);
 
   /// Best guess at the source language for a transcript, from what the
   /// recogniser detected.

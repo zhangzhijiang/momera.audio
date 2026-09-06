@@ -630,6 +630,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cantonese'**
   String get langCantonese;
+
+  /// No description provided for @liveHold.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold for live text'**
+  String get liveHold;
+
+  /// No description provided for @liveListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening…'**
+  String get liveListening;
+
+  /// No description provided for @liveStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting…'**
+  String get liveStarting;
+
+  /// No description provided for @liveEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold the button and speak — text appears as you finish each phrase.'**
+  String get liveEmpty;
+
+  /// No description provided for @liveUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the voice model first to use live text.'**
+  String get liveUnavailable;
+
+  /// No description provided for @liveBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish the transcription in progress first.'**
+  String get liveBusy;
+
+  /// No description provided for @liveTranslateOff.
+  ///
+  /// In en, this message translates to:
+  /// **'No translation'**
+  String get liveTranslateOff;
 }
 
 class _AppLocalizationsDelegate

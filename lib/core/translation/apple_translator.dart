@@ -18,6 +18,12 @@ class AppleTranslator implements Translator {
   @override
   String get id => 'apple';
 
+  /// Every call mounts a fresh SwiftUI host and TranslationSession — there is
+  /// no session cache — so this engine is a poor fit for per-utterance work.
+  /// See TranslationBridge.swift.
+  @override
+  bool get isReusable => false;
+
   static const MethodChannel _channel =
       MethodChannel('com.idatagear.momera.audio/translation');
 

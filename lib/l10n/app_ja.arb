@@ -87,5 +87,12 @@
   "langChineseTraditional": "中国語（繁体字）",
   "langJapanese": "日本語",
   "langKorean": "韓国語",
-  "langCantonese": "広東語"
+  "langCantonese": "広東語",
+  "liveHold": "長押しでリアルタイム表示",
+  "liveListening": "認識中…",
+  "liveStarting": "起動中…",
+  "liveEmpty": "ボタンを長押しして話してください。一文ごとに文字が表示されます。",
+  "liveUnavailable": "リアルタイム表示には音声モデルのダウンロードが必要です。",
+  "liveBusy": "実行中の文字起こしが終わるまでお待ちください。",
+  "liveTranslateOff": "翻訳しない"
 }

@@ -744,6 +744,48 @@ engine. Deferring ML Kit behind Play Feature Delivery would save ~6.8 MB of a
 ~30 MB download and is not worth the machinery. If Android size ever matters,
 ONNX Runtime is the target.
 
+### ⚠️ ML Kit breaks the iOS Simulator on Apple Silicon
+
+**The app can no longer be run on the iOS Simulator on an Apple Silicon Mac.**
+Install fails with:
+
+```
+Failed to find matching arch for input file: .../Runner.app/Runner
+```
+
+Cause, confirmed on 2026-09-05:
+
+```bash
+lipo -info build/ios/iphonesimulator/Runner.app/Runner
+#   Non-fat file: ... is architecture: x86_64
+
+find ios/Pods/MLKitTranslate -name "*.xcframework"   # nothing
+vtool -arch arm64 -show-build-version \
+  ios/Pods/MLKitTranslate/Frameworks/MLKitTranslate.framework/MLKitTranslate
+#   platform IOS      <- device, not simulator
+```
+
+`MLKitTranslate` ships as a **plain fat `.framework`, not an `.xcframework`**,
+and its arm64 slice is the *device* slice. A plain framework cannot carry both
+device-arm64 and simulator-arm64, so there is no simulator-arm64 slice at all.
+The simulator build therefore falls back to x86_64, which an Apple Silicon
+simulator will not run.
+
+**Device builds are unaffected** — the device arm64 slice is present and
+`flutter build ios --release` works.
+
+Workarounds, in order of preference:
+
+1. **Test on a physical device.** Which the release checklist requires anyway.
+2. **Use the Android emulator** for UI work — the ML Kit AAR does ship
+   `arm64-v8a`, so the emulator runs fine.
+3. A Rosetta (x86_64) simulator, if your Xcode still offers one.
+
+This was introduced by the translation feature and went unnoticed for a commit,
+because simulator runs stopped once translation landed. **If a UI change needs
+visual checking, use the Android emulator or a device — do not assume the iOS
+Simulator still works.**
+
 ### iOS carries the same feature at seven times the cost
 
 +48 MB on iOS versus 6.8 MB on Android, and iOS cannot defer it: On-Demand

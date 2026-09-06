@@ -87,5 +87,12 @@
   "langChineseTraditional": "繁体中文",
   "langJapanese": "日语",
   "langKorean": "韩语",
-  "langCantonese": "粤语"
+  "langCantonese": "粤语",
+  "liveHold": "按住实时转写",
+  "liveListening": "正在聆听…",
+  "liveStarting": "正在启动…",
+  "liveEmpty": "按住按钮说话，每说完一句就会显示文字。",
+  "liveUnavailable": "请先下载语音模型才能使用实时转写。",
+  "liveBusy": "请先完成正在进行的转写。",
+  "liveTranslateOff": "不翻译"
 }

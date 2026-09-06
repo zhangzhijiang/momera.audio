@@ -146,6 +146,22 @@ Three facts it will need from this port:
       install waits for ~228 MB before they can transcribe anything. Say so
       explicitly, or it reads as a hang.
 
+- [ ] **⚠️ The primary model URL is dead — fix before release.** Verified
+      2026-09-05:
+      ```bash
+      curl -sSI -L "https://github.com/zhangzhijiang/momera/releases/download/sensevoice_small_model_v20240717/model.int8.onnx"
+      #   HTTP/2 404          <- our "own pinned CDN" does not exist
+      curl -sSI -L "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx"
+      #   HTTP/2 200, content-length: 239233841   <- matches expectedBytes exactly
+      ```
+      `ModelDownloadService.modelUrls` lists the GitHub release first and calls
+      it "our own pinned GitHub Release asset (stable, version-locked)", but
+      that release does not exist. Every first-run download therefore burns a
+      404 before falling back, and **the app depends entirely on a third-party
+      HuggingFace URL** it does not control — if that is rate-limited, moved or
+      taken down, no user can transcribe anything. Either publish the release
+      that URL points at, or remove it and add a CDN you actually own.
+
 ---
 
 ## 5. Build and upload

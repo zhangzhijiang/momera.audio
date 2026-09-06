@@ -313,4 +313,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get langCantonese => 'Cantonese';
+
+  @override
+  String get liveHold => 'Hold for live text';
+
+  @override
+  String get liveListening => 'Listening…';
+
+  @override
+  String get liveStarting => 'Starting…';
+
+  @override
+  String get liveEmpty =>
+      'Hold the button and speak — text appears as you finish each phrase.';
+
+  @override
+  String get liveUnavailable =>
+      'Download the voice model first to use live text.';
+
+  @override
+  String get liveBusy => 'Finish the transcription in progress first.';
+
+  @override
+  String get liveTranslateOff => 'No translation';
 }

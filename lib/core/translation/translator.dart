@@ -128,6 +128,15 @@ abstract class Translator {
     required TranslationLanguage to,
   });
 
+  /// Whether this engine holds its native machinery open across calls.
+  ///
+  /// Matters for per-utterance (live) translation: ML Kit caches one native
+  /// translator per language pair and reuses it, while the Apple bridge mounts
+  /// a fresh SwiftUI host and `TranslationSession` for every call — acceptable
+  /// once per transcript, wasteful once per phrase. Callers translating in a
+  /// tight loop should prefer a reusable engine even if a better one exists.
+  bool get isReusable => true;
+
   /// Release native resources.
   Future<void> dispose();
 }
@@ -176,12 +185,25 @@ class TranslatorRegistry {
   final List<Translator> engines;
 
   /// First engine that is available and supports [to], or null.
-  Future<Translator?> engineFor(TranslationLanguage to) async {
+  ///
+  /// With [preferReusable], engines that do not hold their native machinery
+  /// open across calls are considered only as a last resort — see
+  /// [Translator.isReusable].
+  Future<Translator?> engineFor(
+    TranslationLanguage to, {
+    bool preferReusable = false,
+  }) async {
+    Translator? fallback;
     for (final engine in engines) {
       if (!await engine.isAvailable()) continue;
-      if ((await engine.supportedTargets()).contains(to)) return engine;
+      if (!(await engine.supportedTargets()).contains(to)) continue;
+      if (preferReusable && !engine.isReusable) {
+        fallback ??= engine;
+        continue;
+      }
+      return engine;
     }
-    return null;
+    return fallback;
   }
 
   /// Union of everything the available engines can translate into.

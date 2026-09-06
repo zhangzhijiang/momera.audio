@@ -11,10 +11,13 @@ class _FakeTranslator implements Translator {
     required this.available,
     required this.targets,
     this.output = 'translated',
+    this.isReusable = true,
   });
 
   @override
   final String id;
+  @override
+  final bool isReusable;
   final bool available;
   final Set<TranslationLanguage> targets;
   final String output;
@@ -105,6 +108,50 @@ void main() {
       final registry = TranslatorRegistry([apple, mlkit]);
 
       expect((await registry.engineFor(TranslationLanguage.english))?.id, 'mlkit');
+    });
+
+    test('preferReusable skips a non-reusable engine when another exists',
+        () async {
+      // Live translation runs once per utterance. Apple's bridge mounts a fresh
+      // SwiftUI host per call, so per-phrase work must fall to ML Kit even
+      // though Apple is otherwise preferred.
+      final apple = _FakeTranslator(
+        id: 'apple',
+        available: true,
+        targets: {TranslationLanguage.english},
+        isReusable: false,
+      );
+      final mlkit = _FakeTranslator(
+          id: 'mlkit', available: true, targets: {TranslationLanguage.english});
+      final registry = TranslatorRegistry([apple, mlkit]);
+
+      expect((await registry.engineFor(TranslationLanguage.english))?.id,
+          'apple',
+          reason: 'without the flag, registration order still wins');
+      expect(
+        (await registry.engineFor(TranslationLanguage.english,
+                preferReusable: true))
+            ?.id,
+        'mlkit',
+      );
+    });
+
+    test('preferReusable still returns a non-reusable engine if it is the only '
+        'one', () async {
+      final apple = _FakeTranslator(
+        id: 'apple',
+        available: true,
+        targets: {TranslationLanguage.english},
+        isReusable: false,
+      );
+      final registry = TranslatorRegistry([apple]);
+      expect(
+        (await registry.engineFor(TranslationLanguage.english,
+                preferReusable: true))
+            ?.id,
+        'apple',
+        reason: 'a slow engine beats no translation at all',
+      );
     });
 
     test('returns null when nothing handles the target', () async {

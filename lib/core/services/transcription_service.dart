@@ -116,6 +116,18 @@ class ModelNotReadyException implements Exception {
   String toString() => 'Speech-to-text model has not been downloaded yet.';
 }
 
+/// Thrown when the shared recogniser is already in use by the other path.
+///
+/// File transcription and live transcription share one `OfflineRecognizer`
+/// (loading a second would cost another ~228 MB), and it cannot be driven from
+/// both at once. The UI prevents this by disabling whichever action is not
+/// running; this exception is the backstop.
+class TranscriptionBusyException implements Exception {
+  const TranscriptionBusyException();
+  @override
+  String toString() => 'The recogniser is already transcribing.';
+}
+
 /// Offline, file-based speech-to-text.
 ///
 /// Given a recorded 16 kHz mono WAV file, this runs Silero VAD to split it into
@@ -204,12 +216,21 @@ class TranscriptionService {
   ///
   /// [onProgress] is called with a value in [0.0, 1.0] as the audio is consumed.
   ///
-  /// The VAD feed and the decode both run on the calling isolate — sherpa_onnx
-  /// holds native pointers that are not shareable across isolates, and the
-  /// model is far too expensive to load per transcription. Instead the loop
-  /// yields to the event loop regularly, so the UI keeps painting (a progress
+  /// The VAD feed and the decode both run on the calling isolate, and the loop
+  /// yields to the event loop regularly so the UI keeps painting (a progress
   /// spinner that cannot animate is worse than no spinner) and the app stays
   /// responsive to taps.
+  ///
+  /// Note that running on the calling isolate is a choice, not a constraint.
+  /// An earlier comment here claimed sherpa_onnx pointers "are not shareable
+  /// across isolates" — that is wrong. Every sherpa class exposes a public
+  /// `.ptr` and a `fromPtr` constructor, and `Pointer.address` is an int that
+  /// crosses a `SendPort`, so a worker isolate can rebuild a handle to the
+  /// *same* native object without reloading the model (it must call
+  /// `initBindings()` itself, since the bindings are static and therefore
+  /// per-isolate). The real constraint is exclusive ownership: the native
+  /// objects are not documented as thread-safe, so exactly one isolate may
+  /// touch a given recogniser at a time.
   Future<TranscriptionResult> transcribeFile(
     String wavPath, {
     TranscriptionLanguage language = TranscriptionLanguage.auto,
@@ -217,6 +238,22 @@ class TranscriptionService {
   }) async {
     await initialize(language: language);
 
+    // The recogniser is shared with the live path and is not safe to drive from
+    // both at once — this loop resets the VAD and holds state across awaits.
+    if (!tryAcquire()) {
+      throw const TranscriptionBusyException();
+    }
+    try {
+      return await _transcribeFileLocked(wavPath, onProgress: onProgress);
+    } finally {
+      release();
+    }
+  }
+
+  Future<TranscriptionResult> _transcribeFileLocked(
+    String wavPath, {
+    void Function(double progress)? onProgress,
+  }) async {
     final bytes = await File(wavPath).readAsBytes();
     final pcm = _extractPcmData(bytes);
     final samples = _convertPcm16ToFloat32(pcm);
@@ -277,39 +314,85 @@ class TranscriptionService {
     List<TranscriptionLanguage> detected,
     List<TranscriptSegment> segments,
   ) {
-    final samples = segment.samples;
-    if (_recognizer == null || samples.isEmpty) return;
+    final decoded = decodeSegment(segment.samples, startSamples: segment.start);
+    if (decoded == null) return;
+
+    if (out.isNotEmpty) out.write(' ');
+    out.write(decoded.text);
+
+    // SenseVoice reports the language it identified for this segment. Segments
+    // are decoded independently, so a recording where speakers switch language
+    // yields several entries here.
+    final language = decoded.language;
+    if (language != null && !detected.contains(language)) {
+      detected.add(language);
+    }
+    segments.add(decoded);
+  }
+
+  /// Decode one stretch of speech into a [TranscriptSegment], or null when the
+  /// recogniser produced nothing.
+  ///
+  /// Shared by file transcription and the live path so the two can never drift
+  /// apart in how they decode, read the detected language, or compute timings.
+  ///
+  /// [startSamples] is the sample offset of this speech from the start of the
+  /// recording; the caller owns that number because the VAD's own `start` is
+  /// relative to wherever *it* began being fed, which differs between a
+  /// whole-file pass and a live pass that starts mid-recording.
+  ///
+  /// **Blocking.** `decode` is a native call with no yield point inside it, so
+  /// the calling isolate is stalled for its duration.
+  TranscriptSegment? decodeSegment(
+    Float32List samples, {
+    required int startSamples,
+  }) {
+    if (_recognizer == null || samples.isEmpty) return null;
     final stream = _recognizer!.createStream();
     stream.acceptWaveform(samples: samples, sampleRate: _sampleRate);
     _recognizer!.decode(stream);
     final result = _recognizer!.getResult(stream);
     stream.free();
-    if (result.text.trim().isEmpty) return;
 
     final text = result.text.trim();
-    if (out.isNotEmpty) out.write(' ');
-    out.write(text);
+    if (text.isEmpty) return null;
 
-    // SenseVoice reports the language it identified for this segment. Segments
-    // are decoded independently, so a recording where speakers switch language
-    // yields several entries here.
-    final language = TranscriptionLanguage.fromTag(result.lang);
-    if (language != null && !detected.contains(language)) {
-      detected.add(language);
-    }
-
-    // `segment.start` is a sample offset from the beginning of the recording.
-    final start = Duration(
-      milliseconds: (segment.start * 1000 / _sampleRate).round(),
-    );
-    segments.add(TranscriptSegment(
+    final start =
+        Duration(milliseconds: (startSamples * 1000 / _sampleRate).round());
+    return TranscriptSegment(
       start: start,
       end: start +
           Duration(milliseconds: (samples.length * 1000 / _sampleRate).round()),
       text: text,
-      language: language,
-    ));
+      language: TranscriptionLanguage.fromTag(result.lang),
+    );
   }
+
+  /// Paths needed to build a second VAD for the live path, and proof the model
+  /// is loaded. Null until [initialize] has run.
+  Future<ModelPaths?> modelPathsIfReady() async {
+    if (!isInitialized) return null;
+    return ModelAssetHelper.resolveModelPaths();
+  }
+
+  /// Guards the shared recogniser.
+  ///
+  /// One `OfflineRecognizer` is shared between file transcription and the live
+  /// path — loading a second would cost another ~228 MB of RAM. The native
+  /// object is not documented as thread-safe and `transcribeFile` drives it
+  /// across `await` gaps, so the two paths must not interleave. Callers check
+  /// this before starting and set it for their duration.
+  bool _busy = false;
+  bool get isBusy => _busy;
+
+  /// Claims the recogniser, or returns false if the other path already has it.
+  bool tryAcquire() {
+    if (_busy) return false;
+    _busy = true;
+    return true;
+  }
+
+  void release() => _busy = false;
 
   void dispose() {
     _vad?.free();

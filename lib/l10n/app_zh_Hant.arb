@@ -87,5 +87,12 @@
   "langChineseTraditional": "繁體中文",
   "langJapanese": "日語",
   "langKorean": "韓語",
-  "langCantonese": "粵語"
+  "langCantonese": "粵語",
+  "liveHold": "按住即時轉寫",
+  "liveListening": "正在聆聽…",
+  "liveStarting": "正在啟動…",
+  "liveEmpty": "按住按鈕說話，每說完一句就會顯示文字。",
+  "liveUnavailable": "請先下載語音模型才能使用即時轉寫。",
+  "liveBusy": "請先完成正在進行的轉寫。",
+  "liveTranslateOff": "不翻譯"
 }

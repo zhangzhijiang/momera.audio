@@ -48,7 +48,7 @@ here, the answer is yes.
 | Privacy manifest | n/a | `ios/Runner/PrivacyInfo.xcprivacy` | Apple-only requirement. `shared_preferences_foundation` ships its own manifest declaring UserDefaults access (reason `1C8F.1`) with tracking false; Xcode unions SDK manifests, so ours needs no UserDefaults entry. |
 | Background recording | Foreground service (`RecordingService.kt`) with a persistent notification | `UIBackgroundModes: [audio]` + the plugin's AVAudioSession | Entirely different platform mechanisms for the same behaviour. Android *requires* a visible notification; iOS shows its own indicator and needs no UI. |
 | Device family | phones + tablets (no restriction) | `TARGETED_DEVICE_FAMILY = "1"` (iPhone only) | Deliberate for v1 — see below. Android has no equivalent gate; the same APK runs on tablets. |
-| Architectures | `arm64-v8a`, `x86_64` | device `arm64` | `x86_64` is kept on Android for emulator debug builds. |
+| Architectures | `armeabi-v7a`, `arm64-v8a`, `x86_64` — all three | device `arm64` | The Flutter Gradle Plugin selects Android ABIs and ships all three; Play delivers one config APK per device, so the install is ~30 MB either way. See `android/app/build.gradle.kts` for why there is no `abiFilters` block. |
 
 ### Things that look like they should differ but do not
 
@@ -78,9 +78,18 @@ here, the answer is yes.
 > approved trade for offline translation on iOS 15.5–17.x; without it, iOS
 > would have had no translation below 18, where Apple's own API begins.
 >
-> **To go back to 13.0 you must remove `google_mlkit_translation` entirely** and
-> either drop iOS translation below 18 or drive ML Kit's Android SDK through a
-> native method channel instead of the Flutter plugin.
+> **15.5 is deliberate and permanent. Do not treat it as a regression to
+> undo.** Reverting to 13.0 was measured and explicitly rejected on
+> 2026-09-05: Apple raises the minimum iOS version it will accept over time,
+> and this app would arrive at 15.5 regardless — so the floor is not really a
+> cost of ML Kit, it is a cost that was coming anyway. Paying it early buys
+> offline translation on iOS 15.5–17.x.
+>
+> For background only: reverting would mean removing `google_mlkit_translation`
+> entirely and either dropping iOS translation below 18 or driving ML Kit's
+> Android SDK through a native method channel instead of the Flutter plugin.
+> That would save ~48 MB of iOS binary, and cost offline translation for a band
+> of iOS versions that shrinks every month.
 
 **Below the ML Kit constraint, two plugins independently require 13.0.**
 
@@ -697,19 +706,49 @@ Adding ML Kit roughly doubled both binaries:
 | iOS `Runner.app` | 51.2 MB | **99.5 MB** |
 | Android AAB | 100.8 MB | **141.7 MB** |
 
-The pods and AARs pull in `MLKitVision` as a dependency of `MLKitTranslate`
-even though this app does no vision work.
+`MLKitTranslate.framework` is the bulk of it: 105 MB on disk as a fat binary
+(`x86_64` + `arm64`), of which one slice links in. Its bundled resources are
+only 40 KB, so that is inference-engine **code**, not models — the language
+models are downloaded separately and on demand, ~30 MB each.
 
-**This needs measuring before a Play release.** Google Play caps the
-*download* size of the generated APK set, not the AAB file, and the AAB
-contains every ABI (`arm64-v8a` and `x86_64`) while a device downloads only
-one — so the real figure is well below 141.7 MB. But it is now close enough to
-the cap to be worth checking rather than assuming. Run `bundletool
-get-size total --apks=...` on a generated APK set to get the actual number.
+*(`MLKitVision` arrives as a dependency of `MLKitCommon` despite this app doing
+no vision work, but at 1.9 MB it is not the problem. An earlier note in this
+guide blamed it; that was wrong.)*
 
-Two levers if it becomes a problem: drop `x86_64` from the release build (it is
-only there so debug builds run on the emulator), and reconsider whether ML Kit
-earns its size on iOS given Apple's engine covers iOS 18+ for free.
+### Android: measured, and not a problem
 
-On top of this, the app still downloads a 228 MB speech model at first use.
-**Size is now a real constraint — weigh it before adding another SDK.**
+Measured 2026-09-05 by reading the AAB directly, since `bundletool` is not
+installed:
+
+| | Compressed |
+|---|---|
+| AAB on disk | 141.7 MB |
+| …of which `BUNDLE-METADATA` (debug symbols, **never shipped**) | 59.0 MB |
+| …of which three ABIs, one delivered per device | 24–29 MB each |
+| **Actual download, arm64 phone** | **≈ 29.7 MB** |
+
+**The AAB file size is not the number that matters and never was.** Nothing
+here is close to a Play limit.
+
+Inside that arm64 payload:
+
+| | Compressed | Share |
+|---|---|---|
+| sherpa-onnx (`libonnxruntime.so` + APIs) | 11.4 MB | 43% |
+| **ML Kit** (`libtranslate_jni.so`) | **6.8 MB** | 26% |
+| Flutter engine | 5.4 MB | 21% |
+| other | 2.7 MB | 10% |
+
+So on Android the speech engine is nearly **twice** the size of the translation
+engine. Deferring ML Kit behind Play Feature Delivery would save ~6.8 MB of a
+~30 MB download and is not worth the machinery. If Android size ever matters,
+ONNX Runtime is the target.
+
+### iOS carries the same feature at seven times the cost
+
++48 MB on iOS versus 6.8 MB on Android, and iOS cannot defer it: On-Demand
+Resources cover assets, not linked frameworks, so code in the binary ships in
+the binary. That asymmetry — not the Android figure — is the real size finding.
+
+On top of all this, the app downloads a 228 MB speech model at first use.
+**Weigh size before adding another SDK.**

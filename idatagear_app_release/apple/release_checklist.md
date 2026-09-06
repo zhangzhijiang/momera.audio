@@ -207,10 +207,17 @@ git status --short lib/ android/
 Last run 2026-09-05: analyze clean, **81/81 tests pass**,
 `✓ Built app-release.aab (141.7MB)`.
 
-- [ ] **Measure the real Play download size.** The AAB is 141.7 MB but contains
-      every ABI; a device downloads one. Confirm with
-      `bundletool get-size total` before submitting — this is now close enough
-      to Play's cap to check rather than assume.
+- [x] **Real Play download size — measured, no problem.** The 141.7 MB AAB is
+      not the number that matters: 59 MB of it is `BUNDLE-METADATA` that is
+      never shipped, and it carries three ABIs where a device receives one.
+      **An arm64 phone downloads ≈ 29.7 MB.** Nowhere near a Play limit.
+      Re-measure only if a large dependency is added:
+      ```bash
+      python3 -c "import zipfile,collections;z=zipfile.ZipFile('build/app/outputs/bundle/release/app-release.aab');\
+      g=collections.defaultdict(int);[g.__setitem__(i.filename.split('/')[2] if i.filename.startswith('base/lib/') else 'shared', \
+      g[i.filename.split('/')[2] if i.filename.startswith('base/lib/') else 'shared']+i.compress_size) \
+      for i in z.infolist() if not i.filename.startswith('BUNDLE-METADATA')];print(g)"
+      ```
 
 ---
 

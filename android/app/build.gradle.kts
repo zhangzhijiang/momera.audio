@@ -28,12 +28,29 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
-        
-        ndk {
-            // Include x86_64 so debug builds can run on the Android emulator.
-            abiFilters.add("arm64-v8a")
-            abiFilters.add("x86_64")
-        }
+
+        // No `ndk { abiFilters ... }` here, deliberately.
+        //
+        // The Flutter Gradle Plugin owns abiFilters: configureAbiWithoutSplits()
+        // calls abiFilters.clear() and adds all of armeabi-v7a, arm64-v8a and
+        // x86_64 while the plugin is being applied — which happens before this
+        // script body runs. A bare abiFilters.add(...) here therefore lands on an
+        // already-full set and does nothing. (A block that did exactly that lived
+        // here until 2026-09-05, claiming to select ABIs while having no effect.)
+        //
+        // Shipping all three is correct for an App Bundle: Play builds one config
+        // APK per ABI and a device downloads only its own, so the install is the
+        // same size either way (~30 MB on arm64) whether we ship one ABI or three.
+        //
+        // If ABIs ever do need restricting, it takes BOTH abiFilters.clear() plus
+        // the wanted entries here AND `flutter build --target-platform ...`.
+        // Passing only the build flag yields a broken armeabi-v7a split:
+        // -Ptarget-platform does not feed configureAbiWithoutSplits, so Flutter's
+        // libflutter.so/libapp.so would be omitted while third-party arm32 libs
+        // (onnxruntime, translate_jni) still pass the filter — and Play would keep
+        // offering the app to 32-bit devices. Note also that a static abiFilters
+        // conflicts with `flutter build apk --split-per-abi`, which is why the
+        // Flutter templates ship without one.
     }
 
     // Load signing properties safely.

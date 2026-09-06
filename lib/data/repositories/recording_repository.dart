@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/services/transcription_service.dart';
+import '../../core/translation/translation_service.dart';
+import '../../core/translation/translator.dart';
 import '../models/recording.dart';
 
 /// Filesystem-backed store for [Recording]s.
@@ -56,6 +58,7 @@ class RecordingRepository {
           transcript: sidecar?.text,
           languages: sidecar?.languages ?? const [],
           segments: sidecar?.segments ?? const [],
+          translations: sidecar?.translations ?? const {},
         ),
       );
     }
@@ -146,11 +149,15 @@ class RecordingRepository {
     String text, {
     List<TranscriptionLanguage> languages = const [],
     List<TranscriptSegment> segments = const [],
+    Map<TranslationLanguage, TranslationOutcome> translations = const {},
   }) async {
     final payload = jsonEncode({
       'text': text,
       'languages': [for (final l in languages) l.name],
       'segments': [for (final s in segments) s.toJson()],
+      'translations': {
+        for (final e in translations.entries) e.key.name: e.value.toJson(),
+      },
     });
     await File(_transcriptPath(audioPath)).writeAsString(payload);
   }
@@ -185,12 +192,23 @@ class RecordingRepository {
           for (final raw in (decoded['segments'] as List? ?? const []))
             if (raw is Map<String, dynamic>) TranscriptSegment.fromJson(raw),
         ];
-        return _TranscriptSidecar(text, languages, segments);
+        final translations = <TranslationLanguage, TranslationOutcome>{};
+        final rawTranslations = decoded['translations'];
+        if (rawTranslations is Map<String, dynamic>) {
+          for (final entry in rawTranslations.entries) {
+            final language = TranslationLanguage.fromName(entry.key);
+            final value = entry.value;
+            if (language != null && value is Map<String, dynamic>) {
+              translations[language] = TranslationOutcome.fromJson(value);
+            }
+          }
+        }
+        return _TranscriptSidecar(text, languages, segments, translations);
       }
     } on FormatException {
       // Not JSON — a legacy plain-text sidecar.
     }
-    return _TranscriptSidecar(raw, const [], const []);
+    return _TranscriptSidecar(raw, const [], const [], const {});
   }
 
   /// Derive duration from the WAV byte length for our fixed recording format.
@@ -225,9 +243,11 @@ class RenameCollisionException implements Exception {
 
 /// Parsed contents of a transcript sidecar.
 class _TranscriptSidecar {
-  const _TranscriptSidecar(this.text, this.languages, this.segments);
+  const _TranscriptSidecar(
+      this.text, this.languages, this.segments, this.translations);
 
   final String text;
   final List<TranscriptionLanguage> languages;
   final List<TranscriptSegment> segments;
+  final Map<TranslationLanguage, TranslationOutcome> translations;
 }

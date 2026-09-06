@@ -259,6 +259,50 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get clear => '清除';
+
+  @override
+  String get translate => '翻译';
+
+  @override
+  String get translateTo => '翻译成';
+
+  @override
+  String get translating => '正在翻译…';
+
+  @override
+  String get translationFailed => '翻译失败。';
+
+  @override
+  String get translationUnsupported => '此设备无法翻译该语言组合。';
+
+  @override
+  String get translationCantonese => '粤语翻译需要在线翻译服务，目前尚未提供。';
+
+  @override
+  String translationOf(String language) {
+    return '译文（$language）';
+  }
+
+  @override
+  String get translationSourceUnknown => '翻译需要单一的识别语言，这段录音没有识别到语言或包含多种语言。';
+
+  @override
+  String get langEnglish => '英语';
+
+  @override
+  String get langChineseSimplified => '简体中文';
+
+  @override
+  String get langChineseTraditional => '繁体中文';
+
+  @override
+  String get langJapanese => '日语';
+
+  @override
+  String get langKorean => '韩语';
+
+  @override
+  String get langCantonese => '粤语';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -516,4 +560,48 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get clear => '清除';
+
+  @override
+  String get translate => '翻譯';
+
+  @override
+  String get translateTo => '翻譯成';
+
+  @override
+  String get translating => '正在翻譯…';
+
+  @override
+  String get translationFailed => '翻譯失敗。';
+
+  @override
+  String get translationUnsupported => '此裝置無法翻譯該語言組合。';
+
+  @override
+  String get translationCantonese => '粵語翻譯需要線上翻譯服務，目前尚未提供。';
+
+  @override
+  String translationOf(String language) {
+    return '譯文（$language）';
+  }
+
+  @override
+  String get translationSourceUnknown => '翻譯需要單一的辨識語言，這段錄音沒有辨識到語言或包含多種語言。';
+
+  @override
+  String get langEnglish => '英語';
+
+  @override
+  String get langChineseSimplified => '簡體中文';
+
+  @override
+  String get langChineseTraditional => '繁體中文';
+
+  @override
+  String get langJapanese => '日語';
+
+  @override
+  String get langKorean => '韓語';
+
+  @override
+  String get langCantonese => '粵語';
 }

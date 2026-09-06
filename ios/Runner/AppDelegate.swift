@@ -20,6 +20,7 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registerBackupChannel(with: engineBridge.pluginRegistry)
     registerRecordingSessionChannel(with: engineBridge.pluginRegistry)
+    TranslationBridge.register(with: engineBridge.pluginRegistry)
   }
 
   /// Exposes NSURLIsExcludedFromBackupKey to Dart.

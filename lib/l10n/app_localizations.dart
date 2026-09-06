@@ -546,6 +546,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear'**
   String get clear;
+
+  /// No description provided for @translate.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate'**
+  String get translate;
+
+  /// No description provided for @translateTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate to'**
+  String get translateTo;
+
+  /// No description provided for @translating.
+  ///
+  /// In en, this message translates to:
+  /// **'Translating…'**
+  String get translating;
+
+  /// No description provided for @translationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation failed.'**
+  String get translationFailed;
+
+  /// No description provided for @translationUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This language pair cannot be translated on this device.'**
+  String get translationUnsupported;
+
+  /// No description provided for @translationCantonese.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantonese translation needs an online translator, which is not available yet.'**
+  String get translationCantonese;
+
+  /// No description provided for @translationOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation ({language})'**
+  String translationOf(String language);
+
+  /// No description provided for @translationSourceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate needs a single detected language. This recording has none or several.'**
+  String get translationSourceUnknown;
+
+  /// No description provided for @langEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get langEnglish;
+
+  /// No description provided for @langChineseSimplified.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese (Simplified)'**
+  String get langChineseSimplified;
+
+  /// No description provided for @langChineseTraditional.
+  ///
+  /// In en, this message translates to:
+  /// **'Chinese (Traditional)'**
+  String get langChineseTraditional;
+
+  /// No description provided for @langJapanese.
+  ///
+  /// In en, this message translates to:
+  /// **'Japanese'**
+  String get langJapanese;
+
+  /// No description provided for @langKorean.
+  ///
+  /// In en, this message translates to:
+  /// **'Korean'**
+  String get langKorean;
+
+  /// No description provided for @langCantonese.
+  ///
+  /// In en, this message translates to:
+  /// **'Cantonese'**
+  String get langCantonese;
 }
 
 class _AppLocalizationsDelegate

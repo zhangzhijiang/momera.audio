@@ -73,5 +73,19 @@
   "searchNoResultsHint": "只有已轉寫的錄音才能依說話內容搜尋。",
   "searchResultCount": "{count, plural, other{{count} 筆結果}}",
   "searchMatchedName": "符合名稱",
-  "clear": "清除"
+  "clear": "清除",
+  "translate": "翻譯",
+  "translateTo": "翻譯成",
+  "translating": "正在翻譯…",
+  "translationFailed": "翻譯失敗。",
+  "translationUnsupported": "此裝置無法翻譯該語言組合。",
+  "translationCantonese": "粵語翻譯需要線上翻譯服務，目前尚未提供。",
+  "translationOf": "譯文（{language}）",
+  "translationSourceUnknown": "翻譯需要單一的辨識語言，這段錄音沒有辨識到語言或包含多種語言。",
+  "langEnglish": "英語",
+  "langChineseSimplified": "簡體中文",
+  "langChineseTraditional": "繁體中文",
+  "langJapanese": "日語",
+  "langKorean": "韓語",
+  "langCantonese": "粵語"
 }

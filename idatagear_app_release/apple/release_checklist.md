@@ -43,10 +43,11 @@ re-prove it after any change, not because anything is outstanding.
       ```bash
       grep -c "PRODUCT_BUNDLE_IDENTIFIER = com.idatagear.momera.audio;" ios/Runner.xcodeproj/project.pbxproj  # expect 3
       ```
-- [x] **Deployment target is 13.0 in both places.**
+- [x] **Deployment target is 15.5 in both places.** Raised from 13.0 by
+      `google_mlkit_translation`; see the guide for why and how to reverse it.
       ```bash
-      grep -c "IPHONEOS_DEPLOYMENT_TARGET = 13.0" ios/Runner.xcodeproj/project.pbxproj  # expect 3
-      grep -n "^platform :ios, '13.0'" ios/Podfile                                      # expect 1 hit
+      grep -c "IPHONEOS_DEPLOYMENT_TARGET = 15.5" ios/Runner.xcodeproj/project.pbxproj  # expect 3
+      grep -n "^platform :ios, '15.5'" ios/Podfile                                      # expect 1 hit
       ```
 - [x] **No legacy signing pin.** This is what causes the misleading "your team
       has no devices from which to generate a provisioning profile" on archive.
@@ -203,8 +204,13 @@ flutter build appbundle --release
 git status --short lib/ android/
 ```
 
-Last run 2026-09-05: analyze clean, **14/14 tests pass**,
-`✓ Built app-release.aab (97.7MB)`.
+Last run 2026-09-05: analyze clean, **81/81 tests pass**,
+`✓ Built app-release.aab (141.7MB)`.
+
+- [ ] **Measure the real Play download size.** The AAB is 141.7 MB but contains
+      every ABI; a device downloads one. Confirm with
+      `bundletool get-size total` before submitting — this is now close enough
+      to Play's cap to check rather than assume.
 
 ---
 

@@ -66,27 +66,39 @@ here, the answer is yes.
 
 ---
 
-## Why the deployment target is 13.0
+## Why the deployment target is 15.5
 
-`IPHONEOS_DEPLOYMENT_TARGET = 13.0`, set in `ios/Runner.xcodeproj/project.pbxproj`
+`IPHONEOS_DEPLOYMENT_TARGET = 15.5`, set in `ios/Runner.xcodeproj/project.pbxproj`
 (all three configurations) and `ios/Podfile`.
 
-**Two plugins independently require 13.0.**
+> **It was 13.0 until translation was added.** `google_mlkit_translation`
+> declares an iOS deployment target of **15.5**, and Flutter has no way to
+> include a plugin on one platform only — if the package is a dependency, its
+> pod ships and the whole app's floor moves with it. The bump was a deliberate,
+> approved trade for offline translation on iOS 15.5–17.x; without it, iOS
+> would have had no translation below 18, where Apple's own API begins.
+>
+> **To go back to 13.0 you must remove `google_mlkit_translation` entirely** and
+> either drop iOS translation below 18 or drive ML Kit's Android SDK through a
+> native method channel instead of the Flutter plugin.
+
+**Below the ML Kit constraint, two plugins independently require 13.0.**
 
 | Plugin | iOS floor |
 |---|---|
-| **`sherpa_onnx_ios` 1.13.2** | **13.0** ← binding constraint |
-| **`shared_preferences_foundation` 2.5.7** | **13.0** ← also binding |
+| **`google_mlkit_translation` 0.15.1** | **15.5** ← binding constraint |
+| `sherpa_onnx_ios` 1.13.2 | 13.0 |
+| `shared_preferences_foundation` 2.5.7 | 13.0 |
 | `record_ios` 1.2.1 | 12.0 |
 | `just_audio` 0.10.5 | 12.0 |
 | `audio_session` 0.2.3 | 12.0 |
 | `permission_handler_apple` | 12.0 *(dependency since removed)* |
 
-**The runner-up is 12.0**, but getting there now needs *both* constraints gone.
-Originally only `sherpa_onnx_ios` held the floor; `shared_preferences_foundation`
-arrived with the settings screen and requires 13.0 too. So replacing the speech
-engine alone would no longer let the target drop — settings persistence would
-have to move to a plain JSON file via `path_provider` as well.
+**The runner-up is 13.0** (sherpa-onnx and shared_preferences), and below that
+12.0. Each step down needs every constraint at that level removed, so dropping
+the floor is now a three-part job: remove ML Kit, replace the speech engine, and
+move settings persistence off `shared_preferences`. In practice the floor is
+15.5 for as long as ML Kit is a dependency.
 
 Do not raise it "to be safe" — every bump drops real devices. Raise it only when
 `pod install` actually fails and names the plugin that demands it.
@@ -607,3 +619,97 @@ decision, not an implementation detail.**
 Also: `useInverseTextNormalization` is enabled, so spoken numbers are stored as
 digits — "twenty twenty six" is in the transcript as "2026", and searching the
 words will not find it.
+
+
+---
+
+## Translation
+
+Transcripts can be translated between English, Chinese (Simplified and
+Traditional), Japanese and Korean. Engine selection is per device:
+
+| Platform | Engine | Notes |
+|---|---|---|
+| iOS 18+ | **Apple Translation** | Preferred. System manages the models — nothing for the app to download or explain — and it distinguishes Simplified from Traditional Chinese. |
+| iOS 15.5–17.x | **Google ML Kit** | ~30 MB model per language, downloaded on demand. |
+| Android | **Google ML Kit** | Same. |
+| Cantonese | **none** | See below. |
+
+### The Apple bridge is more involved than it looks
+
+`ios/Runner/TranslationBridge.swift`.
+
+On iOS 18 through 26.3 `TranslationSession` has **no public initialiser** — it
+can only be vended by SwiftUI's `.translationTask` modifier. iOS 26.4 added a
+direct `init()`, but the app supports earlier versions, so the app hosts a
+zero-sized SwiftUI view off-screen, lets SwiftUI hand it a session, resumes a
+continuation with the result, and tears the host down. Requests are serialised
+on the main actor because two sessions sharing one host would race.
+
+Everything is behind `#available(iOS 18, *)`; below that the channel reports
+unavailable and Dart falls back to ML Kit.
+
+### ML Kit cannot tell Simplified from Traditional
+
+ML Kit has a single `chinese` language and returns Simplified. A user on
+Android or iOS 17 who asks for Traditional gets Simplified text. Apple's engine
+handles the distinction properly. This is a known, documented downgrade rather
+than a bug.
+
+### Cantonese has no on-device engine
+
+Neither ML Kit nor Apple translates Cantonese, even though the speech model
+transcribes it. `TranslationService.translate` **refuses** a Cantonese source
+rather than routing it through Chinese — that would return plausible-looking
+text with Cantonese-specific vocabulary and grammar silently mistranslated,
+which is worse than declining. The UI lists Cantonese greyed out with the
+reason.
+
+This is the concrete justification for the online engine slot.
+
+### The online engine is a seam, not an implementation
+
+`OnlineTranslator` in `lib/core/translation/translator.dart` is an abstract type
+with **no implementation and no provider chosen**. Everything above it — engine
+selection, UI, persistence — is written against `Translator`, so adding a cloud
+engine later is a new file plus one entry in `TranslatorRegistry`.
+
+**Implementing it is not just a code change.** The app currently tells users
+transcription "runs fully offline" and its `PrivacyInfo.xcprivacy` declares
+`NSPrivacyCollectedDataTypes = []` — nothing collected. Sending a transcript to
+a server contradicts both. The manifest, the App Store App Privacy answers, that
+copy and a privacy policy all have to change together, and consent must be
+explicit per use — never a silent fallback when an offline engine lacks a pair.
+
+### A multilingual recording cannot be translated
+
+ML Kit needs one definite source language. `TranslationService.sourceFor`
+returns null when the recogniser detected none or several, and the UI says so
+rather than guessing — translating a Cantonese/English conversation as if it
+were all Cantonese would mangle half of it.
+
+### ⚠️ Size cost, and it is now a constraint
+
+Adding ML Kit roughly doubled both binaries:
+
+| | Before translation | After |
+|---|---|---|
+| iOS `Runner.app` | 51.2 MB | **99.5 MB** |
+| Android AAB | 100.8 MB | **141.7 MB** |
+
+The pods and AARs pull in `MLKitVision` as a dependency of `MLKitTranslate`
+even though this app does no vision work.
+
+**This needs measuring before a Play release.** Google Play caps the
+*download* size of the generated APK set, not the AAB file, and the AAB
+contains every ABI (`arm64-v8a` and `x86_64`) while a device downloads only
+one — so the real figure is well below 141.7 MB. But it is now close enough to
+the cap to be worth checking rather than assuming. Run `bundletool
+get-size total --apks=...` on a generated APK set to get the actual number.
+
+Two levers if it becomes a problem: drop `x86_64` from the release build (it is
+only there so debug builds run on the emulator), and reconsider whether ML Kit
+earns its size on iOS given Apple's engine covers iOS 18+ for free.
+
+On top of this, the app still downloads a 228 MB speech model at first use.
+**Size is now a real constraint — weigh it before adding another SDK.**

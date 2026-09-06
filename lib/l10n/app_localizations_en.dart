@@ -266,4 +266,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clear => 'Clear';
+
+  @override
+  String get translate => 'Translate';
+
+  @override
+  String get translateTo => 'Translate to';
+
+  @override
+  String get translating => 'Translating…';
+
+  @override
+  String get translationFailed => 'Translation failed.';
+
+  @override
+  String get translationUnsupported =>
+      'This language pair cannot be translated on this device.';
+
+  @override
+  String get translationCantonese =>
+      'Cantonese translation needs an online translator, which is not available yet.';
+
+  @override
+  String translationOf(String language) {
+    return 'Translation ($language)';
+  }
+
+  @override
+  String get translationSourceUnknown =>
+      'Translate needs a single detected language. This recording has none or several.';
+
+  @override
+  String get langEnglish => 'English';
+
+  @override
+  String get langChineseSimplified => 'Chinese (Simplified)';
+
+  @override
+  String get langChineseTraditional => 'Chinese (Traditional)';
+
+  @override
+  String get langJapanese => 'Japanese';
+
+  @override
+  String get langKorean => 'Korean';
+
+  @override
+  String get langCantonese => 'Cantonese';
 }

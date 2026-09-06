@@ -73,5 +73,19 @@
   "searchNoResultsHint": "只有已转写的录音才能按说话内容搜索。",
   "searchResultCount": "{count, plural, other{{count} 条结果}}",
   "searchMatchedName": "匹配到名称",
-  "clear": "清除"
+  "clear": "清除",
+  "translate": "翻译",
+  "translateTo": "翻译成",
+  "translating": "正在翻译…",
+  "translationFailed": "翻译失败。",
+  "translationUnsupported": "此设备无法翻译该语言组合。",
+  "translationCantonese": "粤语翻译需要在线翻译服务，目前尚未提供。",
+  "translationOf": "译文（{language}）",
+  "translationSourceUnknown": "翻译需要单一的识别语言，这段录音没有识别到语言或包含多种语言。",
+  "langEnglish": "英语",
+  "langChineseSimplified": "简体中文",
+  "langChineseTraditional": "繁体中文",
+  "langJapanese": "日语",
+  "langKorean": "韩语",
+  "langCantonese": "粤语"
 }

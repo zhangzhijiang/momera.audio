@@ -145,5 +145,26 @@
     }
   },
   "searchMatchedName": "Matched the name",
-  "clear": "Clear"
+  "clear": "Clear",
+  "translate": "Translate",
+  "translateTo": "Translate to",
+  "translating": "Translating…",
+  "translationFailed": "Translation failed.",
+  "translationUnsupported": "This language pair cannot be translated on this device.",
+  "translationCantonese": "Cantonese translation needs an online translator, which is not available yet.",
+  "translationOf": "Translation ({language})",
+  "@translationOf": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "translationSourceUnknown": "Translate needs a single detected language. This recording has none or several.",
+  "langEnglish": "English",
+  "langChineseSimplified": "Chinese (Simplified)",
+  "langChineseTraditional": "Chinese (Traditional)",
+  "langJapanese": "Japanese",
+  "langKorean": "Korean",
+  "langCantonese": "Cantonese"
 }

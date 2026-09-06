@@ -73,5 +73,19 @@
   "searchNoResultsHint": "発話内容で検索できるのは、文字起こし済みの録音だけです。",
   "searchResultCount": "{count, plural, other{{count} 件}}",
   "searchMatchedName": "名前が一致",
-  "clear": "クリア"
+  "clear": "クリア",
+  "translate": "翻訳",
+  "translateTo": "翻訳先",
+  "translating": "翻訳中…",
+  "translationFailed": "翻訳に失敗しました。",
+  "translationUnsupported": "この端末ではこの言語の組み合わせを翻訳できません。",
+  "translationCantonese": "広東語の翻訳にはオンライン翻訳が必要ですが、現在は利用できません。",
+  "translationOf": "翻訳（{language}）",
+  "translationSourceUnknown": "翻訳には検出された言語が1つ必要です。この録音には言語がないか、複数含まれています。",
+  "langEnglish": "英語",
+  "langChineseSimplified": "中国語（簡体字）",
+  "langChineseTraditional": "中国語（繁体字）",
+  "langJapanese": "日本語",
+  "langKorean": "韓国語",
+  "langCantonese": "広東語"
 }

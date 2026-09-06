@@ -259,4 +259,49 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get clear => 'クリア';
+
+  @override
+  String get translate => '翻訳';
+
+  @override
+  String get translateTo => '翻訳先';
+
+  @override
+  String get translating => '翻訳中…';
+
+  @override
+  String get translationFailed => '翻訳に失敗しました。';
+
+  @override
+  String get translationUnsupported => 'この端末ではこの言語の組み合わせを翻訳できません。';
+
+  @override
+  String get translationCantonese => '広東語の翻訳にはオンライン翻訳が必要ですが、現在は利用できません。';
+
+  @override
+  String translationOf(String language) {
+    return '翻訳（$language）';
+  }
+
+  @override
+  String get translationSourceUnknown =>
+      '翻訳には検出された言語が1つ必要です。この録音には言語がないか、複数含まれています。';
+
+  @override
+  String get langEnglish => '英語';
+
+  @override
+  String get langChineseSimplified => '中国語（簡体字）';
+
+  @override
+  String get langChineseTraditional => '中国語（繁体字）';
+
+  @override
+  String get langJapanese => '日本語';
+
+  @override
+  String get langKorean => '韓国語';
+
+  @override
+  String get langCantonese => '広東語';
 }

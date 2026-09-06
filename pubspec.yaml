@@ -31,6 +31,7 @@ dependencies:
   intl: ^0.20.2
   shared_preferences: ^2.3.2 # persists the settings screen's choices
   share_plus: ^10.1.2 # share recordings and transcripts to other apps
+  google_mlkit_translation: ^0.15.1
 
 dev_dependencies:
   flutter_test:

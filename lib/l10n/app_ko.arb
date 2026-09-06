@@ -73,5 +73,19 @@
   "searchNoResultsHint": "말한 내용으로 검색하려면 먼저 텍스트로 변환해야 합니다.",
   "searchResultCount": "{count, plural, other{결과 {count}개}}",
   "searchMatchedName": "이름 일치",
-  "clear": "지우기"
+  "clear": "지우기",
+  "translate": "번역",
+  "translateTo": "번역할 언어",
+  "translating": "번역 중…",
+  "translationFailed": "번역에 실패했습니다.",
+  "translationUnsupported": "이 기기에서는 해당 언어 조합을 번역할 수 없습니다.",
+  "translationCantonese": "광둥어 번역에는 온라인 번역기가 필요하지만 아직 제공되지 않습니다.",
+  "translationOf": "번역 ({language})",
+  "translationSourceUnknown": "번역하려면 감지된 언어가 하나여야 합니다. 이 녹음은 언어가 없거나 여러 개입니다.",
+  "langEnglish": "영어",
+  "langChineseSimplified": "중국어(간체)",
+  "langChineseTraditional": "중국어(번체)",
+  "langJapanese": "일본어",
+  "langKorean": "한국어",
+  "langCantonese": "광둥어"
 }

@@ -7,6 +7,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/search/recording_search.dart';
 import '../../core/services/transcription_service.dart';
+import '../../core/translation/translation_service.dart';
+import '../../core/translation/translator.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/duration_format.dart';
 import '../../data/models/recording.dart';
@@ -46,6 +48,7 @@ class RecordingTile extends ConsumerStatefulWidget {
 
 class _RecordingTileState extends ConsumerState<RecordingTile> {
   bool _transcribing = false;
+  bool _translating = false;
   double _progress = 0;
 
   Recording get _recording => widget.recording;
@@ -159,6 +162,114 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Ask for a target language, then translate the transcript into it.
+  Future<void> _translate() async {
+    final l10n = AppLocalizations.of(context)!;
+    final service = ref.read(translationServiceProvider);
+
+    // ML Kit needs one definite source language. A recording with none, or
+    // with several, cannot be handed to it — say so rather than guessing.
+    final source = TranslationService.sourceFor(_recording.languages);
+    if (source == null) {
+      _showSnack(l10n.translationSourceUnknown);
+      return;
+    }
+    if (source == TranslationLanguage.cantonese) {
+      _showSnack(l10n.translationCantonese);
+      return;
+    }
+
+    final available = await service.supportedTargets();
+    if (!mounted) return;
+
+    final target = await showModalBottomSheet<TranslationLanguage>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                l10n.translateTo,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final language in TranslationLanguage.values)
+                    if (language != source)
+                      ListTile(
+                        enabled: available.contains(language),
+                        title: Text(
+                          translationLanguageLabel(l10n, language),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: available.contains(language)
+                                ? AppTheme.textPrimary
+                                : AppTheme.textHint,
+                          ),
+                        ),
+                        // Cantonese is listed but disabled: it is the concrete
+                        // reason the online engine slot exists.
+                        subtitle: language == TranslationLanguage.cantonese
+                            ? Text(
+                                l10n.translationCantonese,
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.textHint),
+                              )
+                            : null,
+                        trailing:
+                            _recording.translations.containsKey(language)
+                                ? const Icon(Icons.check_rounded,
+                                    color: AppTheme.accent, size: 20)
+                                : null,
+                        onTap: () => Navigator.of(sheetContext).pop(language),
+                      ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (target == null || !mounted) return;
+
+    setState(() => _translating = true);
+    try {
+      final outcome = await service.translate(
+        _recording.transcript ?? '',
+        from: source,
+        to: target,
+      );
+      await ref
+          .read(recordingsProvider.notifier)
+          .addTranslation(_recording, outcome);
+    } on TranslationException catch (e) {
+      if (mounted) {
+        _showSnack(e.reason == TranslationFailure.unsupportedPair
+            ? l10n.translationUnsupported
+            : l10n.translationFailed);
+      }
+    } catch (_) {
+      if (mounted) _showSnack(l10n.translationFailed);
+    } finally {
+      if (mounted) setState(() => _translating = false);
+    }
   }
 
   Future<void> _rename() async {
@@ -325,6 +436,8 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                   switch (action) {
                     case _TileAction.rename:
                       _rename();
+                    case _TileAction.translate:
+                      _translate();
                     case _TileAction.copyTranscript:
                       _copyTranscript();
                     case _TileAction.shareAudio:
@@ -348,6 +461,10 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                     ),
                     // Transcript actions only make sense once there is one.
                     if (r.hasTranscript) ...[
+                      PopupMenuItem(
+                        value: _TileAction.translate,
+                        child: _menuRow(Icons.translate_rounded, l10n.translate),
+                      ),
                       PopupMenuItem(
                         value: _TileAction.copyTranscript,
                         child: _menuRow(
@@ -480,6 +597,61 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                 ),
               ),
             ),
+            // Translations, one block per target language.
+            for (final entry in r.translations.entries) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context)!.translationOf(
+                        translationLanguageLabel(
+                            AppLocalizations.of(context)!, entry.key),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.accent,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.value.text,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (_translating) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    AppLocalizations.of(context)!.translating,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+            ],
           ] else ...[
             const SizedBox(height: 8),
             Align(
@@ -541,7 +713,14 @@ class _RoundIconButton extends StatelessWidget {
 
 
 /// Overflow-menu actions on a recording.
-enum _TileAction { rename, shareAudio, copyTranscript, shareTranscript, delete }
+enum _TileAction {
+  rename,
+  shareAudio,
+  translate,
+  copyTranscript,
+  shareTranscript,
+  delete,
+}
 
 Widget _menuRow(IconData icon, String label, {Color? color}) {
   return Row(

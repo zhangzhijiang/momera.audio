@@ -260,4 +260,49 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get clear => '지우기';
+
+  @override
+  String get translate => '번역';
+
+  @override
+  String get translateTo => '번역할 언어';
+
+  @override
+  String get translating => '번역 중…';
+
+  @override
+  String get translationFailed => '번역에 실패했습니다.';
+
+  @override
+  String get translationUnsupported => '이 기기에서는 해당 언어 조합을 번역할 수 없습니다.';
+
+  @override
+  String get translationCantonese => '광둥어 번역에는 온라인 번역기가 필요하지만 아직 제공되지 않습니다.';
+
+  @override
+  String translationOf(String language) {
+    return '번역 ($language)';
+  }
+
+  @override
+  String get translationSourceUnknown =>
+      '번역하려면 감지된 언어가 하나여야 합니다. 이 녹음은 언어가 없거나 여러 개입니다.';
+
+  @override
+  String get langEnglish => '영어';
+
+  @override
+  String get langChineseSimplified => '중국어(간체)';
+
+  @override
+  String get langChineseTraditional => '중국어(번체)';
+
+  @override
+  String get langJapanese => '일본어';
+
+  @override
+  String get langKorean => '한국어';
+
+  @override
+  String get langCantonese => '광둥어';
 }

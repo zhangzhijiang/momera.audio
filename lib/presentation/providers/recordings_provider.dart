@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/transcription_service.dart';
+import '../../core/translation/translation_service.dart';
 import '../../data/models/recording.dart';
 import 'service_providers.dart';
 
@@ -64,6 +65,27 @@ class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
                 segments: segments,
               )
             : r,
+    ]);
+  }
+
+  /// Store a translation alongside the transcript and update it in place.
+  Future<void> addTranslation(
+    Recording recording,
+    TranslationOutcome outcome,
+  ) async {
+    final merged = {...recording.translations, outcome.language: outcome};
+    await ref.read(recordingRepositoryProvider).saveTranscript(
+          recording.path,
+          recording.transcript ?? '',
+          languages: recording.languages,
+          segments: recording.segments,
+          translations: merged,
+        );
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData([
+      for (final r in current)
+        r.path == recording.path ? r.copyWith(translations: merged) : r,
     ]);
   }
 

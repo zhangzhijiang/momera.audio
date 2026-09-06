@@ -1,4 +1,4 @@
-package com.idatagear.momera.audio
+package com.idatagear.momerarecording
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -29,9 +29,9 @@ import androidx.core.app.NotificationCompat
 class RecordingService : Service() {
 
     companion object {
-        const val ACTION_START = "com.idatagear.momera.audio.START_RECORDING"
-        const val ACTION_STOP = "com.idatagear.momera.audio.STOP_RECORDING"
-        const val ACTION_UPDATE = "com.idatagear.momera.audio.UPDATE_RECORDING"
+        const val ACTION_START = "com.idatagear.momerarecording.START_RECORDING"
+        const val ACTION_STOP = "com.idatagear.momerarecording.STOP_RECORDING"
+        const val ACTION_UPDATE = "com.idatagear.momerarecording.UPDATE_RECORDING"
 
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
@@ -46,7 +46,7 @@ class RecordingService : Service() {
         var onStopRequested: (() -> Unit)? = null
     }
 
-    private var title: String = "Momera.Audio"
+    private var title: String = "Momera Recorder"
     private var body: String = "Recording in progress"
     private var stopLabel: String = "Stop"
     private var seconds: Int = 0

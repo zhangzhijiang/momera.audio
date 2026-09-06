@@ -9,7 +9,7 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
-  String get appTitle => 'Momera.Audio';
+  String get appTitle => 'Momera Recorder';
 
   @override
   String get tapToRecord => '탭하여 녹음';

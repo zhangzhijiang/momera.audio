@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:momera_audio/data/models/app_settings.dart';
-import 'package:momera_audio/l10n/app_localizations.dart';
-import 'package:momera_audio/main.dart';
-import 'package:momera_audio/presentation/screens/settings_screen.dart';
-import 'package:momera_audio/presentation/widgets/recording_tile.dart';
+import 'package:momera_recording/data/models/app_settings.dart';
+import 'package:momera_recording/l10n/app_localizations.dart';
+import 'package:momera_recording/main.dart';
+import 'package:momera_recording/presentation/screens/settings_screen.dart';
+import 'package:momera_recording/presentation/widgets/recording_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -56,7 +56,7 @@ void main() {
 
   group('locale resolution', () {
     Locale resolve(Locale? device) =>
-        MomeraAudioApp.resolveLocale(device, AppLocalizations.supportedLocales);
+        MomeraRecordingApp.resolveLocale(device, AppLocalizations.supportedLocales);
 
     test('exact matches are kept', () {
       expect(resolve(const Locale('en')), const Locale('en'));

@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/services/transcription_service.dart';
 
-/// The UI languages Momera.Audio ships.
+/// The UI languages Momera Recorder ships.
 ///
 /// These mirror the five languages the speech model can transcribe, so the
 /// interface is never offered in a language whose audio the app cannot

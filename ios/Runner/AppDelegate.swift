@@ -4,10 +4,10 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   /// Matches ModelDownloadService._backupChannel on the Dart side.
-  private static let backupChannelName = "com.idatagear.momera.audio/backup"
+  private static let backupChannelName = "com.idatagear.momerarecording/backup"
   /// Matches RecordingSessionChannel on the Dart side.
   private static let recordingSessionChannelName =
-    "com.idatagear.momera.audio/recording_session"
+    "com.idatagear.momerarecording/recording_session"
 
   override func application(
     _ application: UIApplication,

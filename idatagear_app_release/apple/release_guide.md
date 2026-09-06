@@ -1,4 +1,4 @@
-# Momera.Audio — iOS release guide
+# Momera Recorder — iOS release guide
 
 Reference for *how* and *why* the iOS build is configured the way it is.
 Companion to [`release_checklist.md`](release_checklist.md), which is the
@@ -39,9 +39,9 @@ here, the answer is yes.
 
 | Concern | Android | iOS | Why they differ |
 |---|---|---|---|
-| Application id | `com.idatagear.momera.audio` | `com.idatagear.momera.audio` | **Deliberately identical.** `flutter create` derived `com.idatagear.momera.momeraAudio` from the Dart package name; that was overridden to match Android. Nothing forced a difference and a matching id is one less thing to get wrong. |
+| Application id | `com.idatagear.momerarecording` | `com.idatagear.momerarecording` | **Deliberately identical.** `flutter create` derives an id from the Dart package name; that was overridden to match Android. Nothing forced a difference and a matching id is one less thing to get wrong. |
 | Minimum OS | `minSdk 24` (Android 7.0) | `IPHONEOS_DEPLOYMENT_TARGET 13.0` | Set by different plugin floors — see below. |
-| Display name | `Momera.Audio` (`AndroidManifest.xml`) | `Momera.Audio` (`CFBundleDisplayName`) | Same string; different mechanism. |
+| Display name | `Momera Recorder` (`AndroidManifest.xml`) | `Momera Recorder` (`CFBundleDisplayName`) | Same string; different mechanism. |
 | Signing | Upload keystore via `android/key.properties` | Automatic, `DEVELOPMENT_TEAM = 6ZWZ3Z58ZT` | Platform mechanics. |
 | Model storage | app support dir | `Library/Application Support` | Same Dart call, `getApplicationSupportDirectory()`. Listed only because the *reason* is iOS-specific — see below. |
 | Backup exclusion | no-op | `NSURLIsExcludedFromBackupKey` via method channel | Android has no iCloud backup of app-private files to opt out of. The Dart side branches on `defaultTargetPlatform` and returns early. |
@@ -157,7 +157,7 @@ would orphan every existing user's 239 MB download** and silently re-download
 it. Any future move of this path needs a migration step.
 
 The exclusion flag is applied through a small method channel
-(`com.idatagear.momera.audio/backup`, handled in `ios/Runner/AppDelegate.swift`)
+(`com.idatagear.momerarecording/backup`, handled in `ios/Runner/AppDelegate.swift`)
 because there is no pure-Dart API for it. The Dart side checks
 `defaultTargetPlatform` and returns early off Apple platforms, and a failure to
 set the flag is logged rather than propagated — it must never fail a download.
@@ -166,7 +166,7 @@ set the flag is logged rather than propagated — it must never fail a download.
 
 ## No tracking — deliberate, and recorded so nobody re-derives it
 
-Momera.Audio ships **no tracking of any kind**, and this is a decision, not an
+Momera Recorder ships **no tracking of any kind**, and this is a decision, not an
 oversight. Recorded here so it is not re-litigated later:
 
 - No ads SDK, no analytics, no crash reporting, no attribution SDK.
@@ -210,7 +210,8 @@ Only what was necessary. Everything below was verified with a real command.
 ### iOS-only
 - `ios/` created from scratch with `flutter create --platforms=ios .`
   (no previous iOS folder existed — no legacy template to clean up).
-- Bundle id corrected from the auto-derived `com.idatagear.momera.momeraAudio`.
+- Bundle id corrected from the one `flutter create` auto-derived from the
+  Dart package name.
 - Deleted `"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer"` from all
   three configurations. The current Flutter template still ships this line, and
   it pins signing to a development identity — the cause of the misleading
@@ -220,7 +221,7 @@ Only what was necessary. Everything below was verified with a real command.
 - `ios/Podfile`: uncommented `platform :ios, '13.0'`.
 - `ios/Runner/Info.plist`: added `NSMicrophoneUsageDescription`,
   `ITSAppUsesNonExemptEncryption = false`, `UIBackgroundModes = [audio]`; set
-  `CFBundleDisplayName` to `Momera.Audio`.
+  `CFBundleDisplayName` to `Momera Recorder`.
 - `ios/Runner/PrivacyInfo.xcprivacy`: created and added to the Runner target's
   Resources build phase (verified present inside the built `.app`, not just on
   disk — a manifest that is not a target member is ignored by Apple).
@@ -367,7 +368,7 @@ from the ARB filename, so `app_zh.arb` becomes `Locale('zh')` while
 using `zh-Hans` hands `MaterialApp` a locale absent from
 `AppLocalizations.supportedLocales`. There is a test pinning this.
 
-`MomeraAudioApp.resolveLocale` handles device locales we do not translate
+`MomeraRecordingApp.resolveLocale` handles device locales we do not translate
 exactly:
 
 - **Chinese is matched first, before the generic exact match.** This is not
@@ -443,7 +444,7 @@ the cap is honoured precisely rather than overshot by up to one buffer.
 
 ### Android: the foreground service
 
-`android/app/src/main/kotlin/com/idatagear/momera/audio/RecordingService.kt`.
+`android/app/src/main/kotlin/com/idatagear/momerarecording/RecordingService.kt`.
 
 Android will not let an app record from the background indefinitely. A
 foreground service is the sanctioned mechanism, and the platform **requires a

@@ -1,11 +1,11 @@
 {
-    "name": "Momera.Audio",
-    "short_name": "Momera.Audio",
+    "name": "Momera Recorder",
+    "short_name": "Momera Recorder",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#8B5CF6",
     "theme_color": "#8B5CF6",
-    "description": "Audio recorder with offline speech-to-text.",
+    "description": "Recorder with offline speech-to-text.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

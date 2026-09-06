@@ -46,7 +46,7 @@ class RecordingSessionChannel {
   const RecordingSessionChannel();
 
   static const MethodChannel _channel =
-      MethodChannel('com.idatagear.momera.audio/recording_session');
+      MethodChannel('com.idatagear.momerarecording/recording_session');
 
   bool get _isSupported =>
       defaultTargetPlatform == TargetPlatform.android ||

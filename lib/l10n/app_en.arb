@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Momera.Audio",
+  "appTitle": "Momera Recorder",
   "@appTitle": {
     "description": "Application name, shown in the app bar"
   },

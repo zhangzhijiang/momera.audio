@@ -1,4 +1,4 @@
-# Momera.Audio — App Store release checklist
+# Momera Recorder — App Store release checklist
 
 Ordered so nothing below the blockers can usefully be started first.
 The *why* for every configuration choice is in
@@ -21,13 +21,13 @@ The *why* for every configuration choice is in
       grep -c "DEVELOPMENT_TEAM = 6ZWZ3Z58ZT" ios/Runner.xcodeproj/project.pbxproj  # expect 3
       ```
 - [ ] **Create the App Store Connect app record** for bundle id
-      `com.idatagear.momera.audio`.
-      Must match exactly — it is **not** the auto-derived
-      `com.idatagear.momera.momeraAudio`.
+      `com.idatagear.momerarecording`.
+      Must match exactly — it is **not** the id `flutter create` derives from
+      the Dart package name.
 - [ ] **Agreements, Tax and Banking** — accept the current Paid/Free Apps
       agreement. Not needed for a free app with no IAP, but it blocks
       *everything* if you later add one and can take more than a day to clear.
-      Momera.Audio currently has **no in-app purchases**, so this is not a v1
+      Momera Recorder currently has **no in-app purchases**, so this is not a v1
       blocker.
 - [ ] *(not applicable)* In-app purchase products — the app has none.
 - [ ] *(not applicable)* AdMob console app and ad units — the app serves no ads.
@@ -41,7 +41,7 @@ re-prove it after any change, not because anything is outstanding.
 
 - [x] **Bundle id matches Android.**
       ```bash
-      grep -c "PRODUCT_BUNDLE_IDENTIFIER = com.idatagear.momera.audio;" ios/Runner.xcodeproj/project.pbxproj  # expect 3
+      grep -c "PRODUCT_BUNDLE_IDENTIFIER = com.idatagear.momerarecording;" ios/Runner.xcodeproj/project.pbxproj  # expect 3
       ```
 - [x] **Deployment target is 15.5 in both places.** Raised from 13.0 by
       `google_mlkit_translation`; see the guide for why and how to reverse it.

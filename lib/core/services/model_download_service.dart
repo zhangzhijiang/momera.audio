@@ -181,7 +181,7 @@ class ModelDownloadService {
   }
 
   static const MethodChannel _backupChannel =
-      MethodChannel('com.idatagear.momera.audio/backup');
+      MethodChannel('com.idatagear.momerarecording/backup');
 
   /// Delete the cached model (and any partial download). Useful for a
   /// "free up space" / re-download action in settings.

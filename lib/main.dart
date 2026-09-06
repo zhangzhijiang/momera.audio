@@ -19,11 +19,11 @@ void main() {
     ),
   );
 
-  runApp(const ProviderScope(child: MomeraAudioApp()));
+  runApp(const ProviderScope(child: MomeraRecordingApp()));
 }
 
-class MomeraAudioApp extends ConsumerWidget {
-  const MomeraAudioApp({super.key});
+class MomeraRecordingApp extends ConsumerWidget {
+  const MomeraRecordingApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,7 +31,7 @@ class MomeraAudioApp extends ConsumerWidget {
     final locale = ref.watch(settingsProvider.select((s) => s.language.locale));
 
     return MaterialApp(
-      title: 'Momera.Audio',
+      title: 'Momera Recorder',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       locale: locale,

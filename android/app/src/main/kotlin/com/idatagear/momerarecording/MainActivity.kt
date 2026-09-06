@@ -1,4 +1,4 @@
-package com.idatagear.momera.audio
+package com.idatagear.momerarecording
 
 import android.Manifest
 import android.content.Intent
@@ -96,7 +96,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val RECORDING_SESSION_CHANNEL =
-            "com.idatagear.momera.audio/recording_session"
+            "com.idatagear.momerarecording/recording_session"
         private const val NOTIFICATION_PERMISSION_REQUEST = 4712
     }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:momera_audio/core/services/transcription_service.dart';
-import 'package:momera_audio/core/translation/translation_service.dart';
-import 'package:momera_audio/core/translation/translator.dart';
+import 'package:momera_recording/core/services/transcription_service.dart';
+import 'package:momera_recording/core/translation/translation_service.dart';
+import 'package:momera_recording/core/translation/translator.dart';
 
 /// Stand-in engine so registry and service logic can be tested without a
 /// platform channel or an ML Kit model download.

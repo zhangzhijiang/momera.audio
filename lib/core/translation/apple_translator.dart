@@ -25,7 +25,7 @@ class AppleTranslator implements Translator {
   bool get isReusable => false;
 
   static const MethodChannel _channel =
-      MethodChannel('com.idatagear.momera.audio/translation');
+      MethodChannel('com.idatagear.momerarecording/translation');
 
   @override
   Future<bool> isAvailable() async {

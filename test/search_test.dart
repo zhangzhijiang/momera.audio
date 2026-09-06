@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:momera_audio/core/search/han_variants.dart';
-import 'package:momera_audio/core/search/recording_search.dart';
-import 'package:momera_audio/core/services/transcription_service.dart';
-import 'package:momera_audio/data/models/recording.dart';
+import 'package:momera_recording/core/search/han_variants.dart';
+import 'package:momera_recording/core/search/recording_search.dart';
+import 'package:momera_recording/core/services/transcription_service.dart';
+import 'package:momera_recording/data/models/recording.dart';
 
 Recording _rec(
   String path, {

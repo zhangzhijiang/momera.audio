@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:momera_audio/core/audio/wav.dart';
-import 'package:momera_audio/core/services/audio_recording_service.dart';
+import 'package:momera_recording/core/audio/wav.dart';
+import 'package:momera_recording/core/services/audio_recording_service.dart';
 
 /// Reads a little-endian uint32 at [offset].
 int _u32(Uint8List bytes, int offset) =>

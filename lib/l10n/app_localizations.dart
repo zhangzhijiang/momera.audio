@@ -106,7 +106,7 @@ abstract class AppLocalizations {
   /// Application name, shown in the app bar
   ///
   /// In en, this message translates to:
-  /// **'Momera.Audio'**
+  /// **'Momera Recorder'**
   String get appTitle;
 
   /// No description provided for @tapToRecord.

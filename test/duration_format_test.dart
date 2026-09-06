@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:momera_audio/core/utils/duration_format.dart';
+import 'package:momera_recording/core/utils/duration_format.dart';
 
 void main() {
   group('formatDuration', () {

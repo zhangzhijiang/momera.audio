@@ -19,7 +19,7 @@ import UIKit
 /// Everything is gated on `#available(iOS 18, *)`; below that the channel
 /// reports unavailable and Dart falls back to ML Kit.
 enum TranslationBridge {
-  static let channelName = "com.idatagear.momera.audio/translation"
+  static let channelName = "com.idatagear.momerarecording/translation"
 
   /// Languages the app offers. Kept in step with TranslationLanguage on the
   /// Dart side; anything Apple does not actually support is filtered out at

@@ -1,7 +1,7 @@
-name: momera_audio
-description: An audio recorder with offline speech-to-text transcription.
+name: momera_recording
+description: A recorder with offline speech-to-text transcription.
 publish_to: "none"
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

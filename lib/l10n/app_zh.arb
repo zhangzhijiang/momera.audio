@@ -1,6 +1,6 @@
 {
   "@@locale": "zh",
-  "appTitle": "Momera.Audio",
+  "appTitle": "Momera Recorder",
   "tapToRecord": "点击录音",
   "noRecordingsTitle": "还没有录音",
   "noRecordingsBody": "点击录音按钮开始录制。",

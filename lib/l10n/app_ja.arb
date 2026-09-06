@@ -1,6 +1,6 @@
 {
   "@@locale": "ja",
-  "appTitle": "Momera.Audio",
+  "appTitle": "Momera Recorder",
   "tapToRecord": "タップして録音",
   "noRecordingsTitle": "録音がまだありません",
   "noRecordingsBody": "録音ボタンをタップして音声を記録します。",

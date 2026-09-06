@@ -1,9 +1,10 @@
-# Momera.Audio
+# Momera Recorder
 
-A simple, local-first **audio recorder** with optional **offline speech-to-text
-transcription**.
+A simple, local-first **recorder** with optional **offline speech-to-text
+transcription**. It captures audio today; the name is deliberately not
+audio-specific, leaving room for other capture types later.
 
-- **Package:** `com.idatagear.momera.audio`
+- **Package:** `com.idatagear.momerarecording`
 - Record audio (16 kHz mono WAV — transcription-ready)
 - Play back, manage, and delete recordings
 - Transcribe any saved recording to text, fully offline, on demand

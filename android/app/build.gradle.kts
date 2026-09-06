@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.idatagear.momera.audio"
+    namespace = "com.idatagear.momerarecording"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.idatagear.momera.audio"
+        applicationId = "com.idatagear.momerarecording"
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode

@@ -21,7 +21,6 @@
   "settingsLanguageSubtitle": "应用界面使用的语言",
   "languageSystem": "跟随系统",
   "languageEnglish": "English",
-  "languageSpanish": "Español",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
   "settingsStorage": "存储空间",
@@ -66,5 +65,13 @@
   "shareFailed": "无法分享这段录音。",
   "pause": "暂停",
   "resume": "继续",
-  "paused": "已暂停"
+  "paused": "已暂停",
+  "languageJapanese": "日本語",
+  "languageKorean": "한국어",
+  "searchHint": "搜索录音和转写文字",
+  "searchNoResults": "没有匹配“{query}”的结果。",
+  "searchNoResultsHint": "只有已转写的录音才能按说话内容搜索。",
+  "searchResultCount": "{count, plural, other{{count} 条结果}}",
+  "searchMatchedName": "匹配到名称",
+  "clear": "清除"
 }

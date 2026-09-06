@@ -501,20 +501,21 @@ The token vocabulary contains tags for many more languages (`es`, `de`, `fr`,
 …), inherited from the vocabulary the model was built on. **The checkpoint is
 not trained for them.** Do not read the vocabulary as a capability list.
 
-### ⚠️ Spanish is a UI language but not a transcription language
+### UI languages mirror the model's languages — resolved
 
-The app UI ships in Spanish; the recogniser cannot transcribe Spanish. A Spanish
-speaker gets a Spanish interface and then cannot transcribe their own recordings.
+Spanish was dropped. The UI now ships in exactly the languages the recogniser
+can transcribe, so the interface is never offered in a language whose speech the
+app cannot handle:
 
-This is a genuine product mismatch, not a bug in the code. Options, none of them
-free:
+| UI locale | Serves |
+|---|---|
+| `en` | English |
+| `zh` | Mandarin (Simplified) |
+| `zh-Hant` | **Cantonese** and Traditional readers — there is no separate written Cantonese locale; Hong Kong and Macau read Traditional |
+| `ja` | Japanese |
+| `ko` | Korean |
 
-- Ship a second model for European languages (a much bigger download).
-- Say so plainly in the Spanish listing and in the app.
-- Drop Spanish from the UI languages.
-
-Recorded here so the decision is made deliberately rather than discovered by a
-reviewer.
+A device set to Spanish, French, German, etc. falls back to English.
 
 ### Auto-detection is per speech segment
 
@@ -542,3 +543,67 @@ construction.
 Storing detected languages meant the `<name>.txt` sidecar became JSON
 (`{"text": ..., "languages": [...]}`). The reader still accepts the old
 plain-text form, so transcripts written before this change are not lost.
+
+
+---
+
+## Search
+
+Search covers recording names and transcript text, and returns **hits within a
+recording** — tapping one seeks playback to the moment the words were spoken.
+
+### It is a plain scan, deliberately
+
+No index, no database. Transcripts are small and the list is already in memory,
+so a `contains` over what is loaded is the right tool until there are thousands
+of recordings. SQLite FTS would add a schema, a dependency and a migration for
+no user-visible gain today.
+
+### Timed segments
+
+`TranscriptSegment {start, end, text, language}` is captured during
+transcription and stored in the transcript sidecar. The data was already there
+and being discarded: the VAD reports `SpeechSegment.start` (a sample offset) for
+every phrase it emits, and the recogniser reports the language per segment.
+
+Transcripts written before segments existed still match — they just cannot offer
+a seek position. The sidecar reader handles all three historical shapes (plain
+text, JSON without segments, JSON with segments).
+
+### ⚠️ Traditional/Simplified folding is load-bearing
+
+`lib/core/search/han_variants.dart` folds Traditional Han to Simplified before
+comparing, in **both** the query and the text.
+
+This is not a nicety. The app ships both Chinese scripts and transcribes
+Mandarin and Cantonese, so the same words are routinely written both ways —
+without folding, searching 會議 would not find a transcript containing 会议.
+That is the single most likely way search would appear broken to a
+Chinese-speaking user, and it is verified end to end on the simulator.
+
+The table is a **curated subset** (~660 rules), not a general converter. It:
+
+- does not handle one-to-many mappings (乾/幹/干 all fold to 干), which is fine
+  for substring matching but **must never be used to convert displayed text**;
+- passes unknown characters through unchanged, so an incomplete table degrades
+  to "this character matches only itself" rather than to a wrong result.
+
+Extend it by appending a pair to `_pairs`. It was built by auditing common words
+against the table rather than by guesswork — the first pass silently omitted
+會, 沒, 麼, 後, 數 and 辦, which the audit caught.
+
+### What search cannot do, and why users will notice
+
+**Only transcribed recordings are searchable by speech.** Transcription is a
+manual per-recording action, so a user who records twenty things and transcribes
+two will search and conclude search is broken. The empty-results screen says so
+explicitly rather than just showing "no results".
+
+Making this go away means auto-transcribing after each recording, which costs
+real CPU and battery — significant after a multi-hour background recording — and
+cannot happen until the 228 MB model is downloaded. **That is a product
+decision, not an implementation detail.**
+
+Also: `useInverseTextNormalization` is enabled, so spoken numbers are stored as
+digits — "twenty twenty six" is in the transcript as "2026", and searching the
+words will not find it.

@@ -47,10 +47,53 @@ enum TranscriptionLanguage {
   }
 }
 
+/// One recognised stretch of speech, with where it sits in the recording.
+///
+/// The VAD reports the sample offset of every segment it emits, and that offset
+/// was previously discarded. Keeping it is what lets a search hit seek playback
+/// to the moment the words were spoken rather than merely naming the file.
+@immutable
+class TranscriptSegment {
+  const TranscriptSegment({
+    required this.start,
+    required this.end,
+    required this.text,
+    this.language,
+  });
+
+  factory TranscriptSegment.fromJson(Map<String, dynamic> json) {
+    return TranscriptSegment(
+      start: Duration(milliseconds: (json['startMs'] as num?)?.toInt() ?? 0),
+      end: Duration(milliseconds: (json['endMs'] as num?)?.toInt() ?? 0),
+      text: json['text'] as String? ?? '',
+      language: json['language'] == null
+          ? null
+          : TranscriptionLanguage.fromName(json['language'] as String?),
+    );
+  }
+
+  /// Offset from the start of the recording.
+  final Duration start;
+  final Duration end;
+  final String text;
+  final TranscriptionLanguage? language;
+
+  Map<String, dynamic> toJson() => {
+        'startMs': start.inMilliseconds,
+        'endMs': end.inMilliseconds,
+        'text': text,
+        if (language != null) 'language': language!.name,
+      };
+}
+
 /// Transcript plus the languages the recogniser detected while producing it.
 @immutable
 class TranscriptionResult {
-  const TranscriptionResult({required this.text, required this.languages});
+  const TranscriptionResult({
+    required this.text,
+    required this.languages,
+    this.segments = const [],
+  });
 
   final String text;
 
@@ -58,6 +101,9 @@ class TranscriptionResult {
   /// first encountered. More than one entry means the speakers switched
   /// language during the recording.
   final List<TranscriptionLanguage> languages;
+
+  /// Per-phrase breakdown with timings, used by search to jump to a moment.
+  final List<TranscriptSegment> segments;
 
   bool get isEmpty => text.trim().isEmpty;
 }
@@ -182,6 +228,7 @@ class TranscriptionService {
     // Preserves first-seen order, so the UI can show which languages appeared
     // and in what order they turned up.
     final detected = <TranscriptionLanguage>[];
+    final segments = <TranscriptSegment>[];
 
     // Feed the audio to the VAD in fixed windows and transcribe each completed
     // speech segment.
@@ -192,7 +239,7 @@ class TranscriptionService {
           Float32List.sublistView(samples, offset, offset + _vadWindowSamples);
       vad.acceptWaveform(window);
       while (!vad.isEmpty()) {
-        _appendSegment(vad.front().samples, buffer, detected);
+        _appendSegment(vad.front(), buffer, detected, segments);
         vad.pop();
         // Decoding a segment is the expensive step; always yield after one.
         sinceYield = _yieldThreshold;
@@ -211,7 +258,7 @@ class TranscriptionService {
     // Flush any trailing speech the VAD has not yet emitted.
     vad.flush();
     while (!vad.isEmpty()) {
-      _appendSegment(vad.front().samples, buffer, detected);
+      _appendSegment(vad.front(), buffer, detected, segments);
       vad.pop();
       await Future<void>.delayed(Duration.zero);
     }
@@ -220,14 +267,17 @@ class TranscriptionService {
     return TranscriptionResult(
       text: buffer.toString().trim(),
       languages: detected,
+      segments: segments,
     );
   }
 
   void _appendSegment(
-    Float32List samples,
+    sherpa_onnx.SpeechSegment segment,
     StringBuffer out,
     List<TranscriptionLanguage> detected,
+    List<TranscriptSegment> segments,
   ) {
+    final samples = segment.samples;
     if (_recognizer == null || samples.isEmpty) return;
     final stream = _recognizer!.createStream();
     stream.acceptWaveform(samples: samples, sampleRate: _sampleRate);
@@ -236,8 +286,9 @@ class TranscriptionService {
     stream.free();
     if (result.text.trim().isEmpty) return;
 
+    final text = result.text.trim();
     if (out.isNotEmpty) out.write(' ');
-    out.write(result.text.trim());
+    out.write(text);
 
     // SenseVoice reports the language it identified for this segment. Segments
     // are decoded independently, so a recording where speakers switch language
@@ -246,6 +297,18 @@ class TranscriptionService {
     if (language != null && !detected.contains(language)) {
       detected.add(language);
     }
+
+    // `segment.start` is a sample offset from the beginning of the recording.
+    final start = Duration(
+      milliseconds: (segment.start * 1000 / _sampleRate).round(),
+    );
+    segments.add(TranscriptSegment(
+      start: start,
+      end: start +
+          Duration(milliseconds: (samples.length * 1000 / _sampleRate).round()),
+      text: text,
+      language: language,
+    ));
   }
 
   void dispose() {

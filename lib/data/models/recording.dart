@@ -31,6 +31,11 @@ class Recording {
   /// languages were recorded.
   final List<TranscriptionLanguage> languages;
 
+  /// Per-phrase transcript with timings. Empty for recordings transcribed
+  /// before segments were stored — they are still searchable via [transcript],
+  /// just without a seek position.
+  final List<TranscriptSegment> segments;
+
   const Recording({
     required this.path,
     required this.createdAt,
@@ -38,6 +43,7 @@ class Recording {
     this.duration,
     this.transcript,
     this.languages = const [],
+    this.segments = const [],
   });
 
   /// File name including extension, e.g. `recording_20260620_143000.wav`.
@@ -70,6 +76,7 @@ class Recording {
     Duration? duration,
     String? transcript,
     List<TranscriptionLanguage>? languages,
+    List<TranscriptSegment>? segments,
   }) {
     return Recording(
       path: path ?? this.path,
@@ -78,6 +85,7 @@ class Recording {
       duration: duration ?? this.duration,
       transcript: transcript ?? this.transcript,
       languages: languages ?? this.languages,
+      segments: segments ?? this.segments,
     );
   }
 }

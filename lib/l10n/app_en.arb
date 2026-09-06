@@ -38,7 +38,6 @@
   "settingsLanguageSubtitle": "Language used throughout the app",
   "languageSystem": "System default",
   "languageEnglish": "English",
-  "languageSpanish": "Español",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
   "settingsStorage": "Storage",
@@ -124,5 +123,27 @@
   "shareFailed": "Could not share this recording.",
   "pause": "Pause",
   "resume": "Resume",
-  "paused": "Paused"
+  "paused": "Paused",
+  "languageJapanese": "日本語",
+  "languageKorean": "한국어",
+  "searchHint": "Search recordings and transcripts",
+  "searchNoResults": "Nothing matches “{query}”.",
+  "@searchNoResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "searchNoResultsHint": "Only recordings you have transcribed can be searched by what was said.",
+  "searchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
+  "@searchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchMatchedName": "Matched the name",
+  "clear": "Clear"
 }

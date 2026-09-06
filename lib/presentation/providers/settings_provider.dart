@@ -59,3 +59,7 @@ final storageUsedProvider = FutureProvider<int>((ref) async {
   ref.watch(recordingsProvider);
   return ref.read(recordingRepositoryProvider).totalBytes();
 });
+
+
+/// The active search query. Empty means "show everything".
+final searchQueryProvider = StateProvider<String>((ref) => '');

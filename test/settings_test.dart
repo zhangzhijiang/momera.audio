@@ -12,6 +12,20 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('AppLanguage', () {
+    test('offers exactly the languages the model can transcribe', () {
+      // The UI is never offered in a language whose speech the app cannot
+      // handle. Cantonese has no separate written locale, so it is served by
+      // Traditional Chinese.
+      expect(AppLanguage.values.map((l) => l.name).toSet(), {
+        'system',
+        'english',
+        'chineseSimplified',
+        'chineseTraditional',
+        'japanese',
+        'korean',
+      });
+    });
+
     test('every language maps to a locale AppLocalizations supports', () {
       for (final language in AppLanguage.values) {
         final locale = language.locale;
@@ -46,7 +60,8 @@ void main() {
 
     test('exact matches are kept', () {
       expect(resolve(const Locale('en')), const Locale('en'));
-      expect(resolve(const Locale('es')), const Locale('es'));
+      expect(resolve(const Locale('ja')), const Locale('ja'));
+      expect(resolve(const Locale('ko')), const Locale('ko'));
     });
 
     test('Chinese regions pick the right script', () {
@@ -59,13 +74,16 @@ void main() {
     });
 
     test('regional variants fall back to the base language', () {
-      expect(resolve(const Locale('es', 'MX')), const Locale('es'));
+      expect(resolve(const Locale('ja', 'JP')), const Locale('ja'));
       expect(resolve(const Locale('en', 'GB')), const Locale('en'));
     });
 
     test('untranslated languages and a null device fall back to English', () {
       expect(resolve(const Locale('de')), const Locale('en'));
-      expect(resolve(const Locale('ja')), const Locale('en'));
+      // Spanish was dropped: the model cannot transcribe it, so offering a
+      // Spanish UI promised something the app could not deliver.
+      expect(resolve(const Locale('es')), const Locale('en'));
+      expect(resolve(const Locale('fr')), const Locale('en'));
       expect(resolve(null), const Locale('en'));
     });
   });
@@ -146,10 +164,10 @@ void main() {
       await tester.tap(find.text('System default'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Español').last);
+      await tester.tap(find.text('日本語').last);
       await tester.pumpAndSettle();
 
-      expect(find.text('Español'), findsOneWidget);
+      expect(find.text('日本語'), findsOneWidget);
     });
   });
 }

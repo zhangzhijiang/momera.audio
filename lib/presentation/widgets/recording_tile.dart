@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/search/recording_search.dart';
 import '../../core/services/transcription_service.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/duration_format.dart';
@@ -27,9 +28,17 @@ String formatCreatedAt(DateTime when) =>
     DateFormat('yyyy-MM-dd HH:mm:ss').format(when);
 
 class RecordingTile extends ConsumerStatefulWidget {
-  const RecordingTile({super.key, required this.recording});
+  const RecordingTile({
+    super.key,
+    required this.recording,
+    this.hits = const [],
+  });
 
   final Recording recording;
+
+  /// Search hits inside this recording. Rendered as tappable snippets that
+  /// seek playback to the moment the words were spoken.
+  final List<SearchHit> hits;
 
   @override
   ConsumerState<RecordingTile> createState() => _RecordingTileState();
@@ -44,6 +53,22 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
   bool get _isThisPlaying {
     final playback = ref.read(audioPlaybackServiceProvider);
     return playback.currentlyPlaying == _recording.path;
+  }
+
+  /// Play this recording from the moment a search hit was spoken.
+  Future<void> _playFrom(Duration position) async {
+    final l10n = AppLocalizations.of(context)!;
+    final playback = ref.read(audioPlaybackServiceProvider);
+    try {
+      if (!_isThisPlaying) {
+        await playback.play(_recording.path);
+      }
+      await playback.seek(position);
+      if (!playback.isPlaying) await playback.resume();
+    } catch (_) {
+      if (mounted) _showSnack(l10n.playbackFailed);
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _togglePlay() async {
@@ -92,6 +117,7 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
             _recording,
             result.text,
             languages: result.languages,
+            segments: result.segments,
           );
       if (mounted && result.isEmpty) {
         _showSnack(l10n.noSpeechDetected);
@@ -346,6 +372,61 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
               ),
             ],
           ),
+          // Search hits: one tappable line per matching phrase, showing where
+          // in the recording it was said.
+          if (widget.hits.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            for (final hit in widget.hits)
+              if (hit.segment != null)
+                InkWell(
+                  onTap: () => _playFrom(hit.segment!.start),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 6, horizontal: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.play_circle_outline_rounded,
+                            size: 16, color: AppTheme.accent),
+                        const SizedBox(width: 8),
+                        Text(
+                          formatDuration(hit.segment!.start),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.accent,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            hit.segment!.text,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (hit.matchedName)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: Text(
+                    AppLocalizations.of(context)!.searchMatchedName,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textHint),
+                  ),
+                ),
+          ],
           if (r.hasTranscript) ...[
             // Which languages the recogniser heard. Worth surfacing because the
             // model detects per phrase, so a bilingual conversation lists more

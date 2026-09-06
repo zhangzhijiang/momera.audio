@@ -55,6 +55,7 @@ class RecordingRepository {
           duration: _durationForWavBytes(stat.size),
           transcript: sidecar?.text,
           languages: sidecar?.languages ?? const [],
+          segments: sidecar?.segments ?? const [],
         ),
       );
     }
@@ -144,10 +145,12 @@ class RecordingRepository {
     String audioPath,
     String text, {
     List<TranscriptionLanguage> languages = const [],
+    List<TranscriptSegment> segments = const [],
   }) async {
     final payload = jsonEncode({
       'text': text,
       'languages': [for (final l in languages) l.name],
+      'segments': [for (final s in segments) s.toJson()],
     });
     await File(_transcriptPath(audioPath)).writeAsString(payload);
   }
@@ -178,12 +181,16 @@ class RecordingRepository {
           for (final name in (decoded['languages'] as List? ?? const []))
             TranscriptionLanguage.fromName(name as String?),
         ];
-        return _TranscriptSidecar(text, languages);
+        final segments = <TranscriptSegment>[
+          for (final raw in (decoded['segments'] as List? ?? const []))
+            if (raw is Map<String, dynamic>) TranscriptSegment.fromJson(raw),
+        ];
+        return _TranscriptSidecar(text, languages, segments);
       }
     } on FormatException {
       // Not JSON — a legacy plain-text sidecar.
     }
-    return _TranscriptSidecar(raw, const []);
+    return _TranscriptSidecar(raw, const [], const []);
   }
 
   /// Derive duration from the WAV byte length for our fixed recording format.
@@ -218,8 +225,9 @@ class RenameCollisionException implements Exception {
 
 /// Parsed contents of a transcript sidecar.
 class _TranscriptSidecar {
-  const _TranscriptSidecar(this.text, this.languages);
+  const _TranscriptSidecar(this.text, this.languages, this.segments);
 
   final String text;
   final List<TranscriptionLanguage> languages;
+  final List<TranscriptSegment> segments;
 }

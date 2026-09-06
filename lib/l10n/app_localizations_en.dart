@@ -78,9 +78,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
-  String get languageSpanish => 'Español';
-
-  @override
   String get languageChineseSimplified => '简体中文';
 
   @override
@@ -234,4 +231,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paused => 'Paused';
+
+  @override
+  String get languageJapanese => '日本語';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
+  String get searchHint => 'Search recordings and transcripts';
+
+  @override
+  String searchNoResults(String query) {
+    return 'Nothing matches “$query”.';
+  }
+
+  @override
+  String get searchNoResultsHint =>
+      'Only recordings you have transcribed can be searched by what was said.';
+
+  @override
+  String searchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count results',
+      one: '1 result',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get searchMatchedName => 'Matched the name';
+
+  @override
+  String get clear => 'Clear';
 }

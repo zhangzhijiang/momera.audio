@@ -45,18 +45,24 @@ class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
     Recording recording,
     String transcript, {
     List<TranscriptionLanguage> languages = const [],
+    List<TranscriptSegment> segments = const [],
   }) async {
     await ref.read(recordingRepositoryProvider).saveTranscript(
           recording.path,
           transcript,
           languages: languages,
+          segments: segments,
         );
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData([
       for (final r in current)
         r.path == recording.path
-            ? r.copyWith(transcript: transcript, languages: languages)
+            ? r.copyWith(
+                transcript: transcript,
+                languages: languages,
+                segments: segments,
+              )
             : r,
     ]);
   }

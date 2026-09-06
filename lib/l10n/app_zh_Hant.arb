@@ -21,7 +21,6 @@
   "settingsLanguageSubtitle": "應用程式介面使用的語言",
   "languageSystem": "跟隨系統",
   "languageEnglish": "English",
-  "languageSpanish": "Español",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
   "settingsStorage": "儲存空間",
@@ -66,5 +65,13 @@
   "shareFailed": "無法分享這段錄音。",
   "pause": "暫停",
   "resume": "繼續",
-  "paused": "已暫停"
+  "paused": "已暫停",
+  "languageJapanese": "日本語",
+  "languageKorean": "한국어",
+  "searchHint": "搜尋錄音和轉寫文字",
+  "searchNoResults": "沒有符合「{query}」的結果。",
+  "searchNoResultsHint": "只有已轉寫的錄音才能依說話內容搜尋。",
+  "searchResultCount": "{count, plural, other{{count} 筆結果}}",
+  "searchMatchedName": "符合名稱",
+  "clear": "清除"
 }

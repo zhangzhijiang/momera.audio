@@ -4,17 +4,23 @@ import '../../core/services/transcription_service.dart';
 
 /// The UI languages Momera.Audio ships.
 ///
+/// These mirror the five languages the speech model can transcribe, so the
+/// interface is never offered in a language whose audio the app cannot
+/// actually handle. Cantonese has no separate written locale — Hong Kong and
+/// Macau read Traditional Chinese — so it maps to [chineseTraditional].
+///
 /// [system] follows the device language, falling back to English when the
 /// device language is not one we translate.
 enum AppLanguage {
   system(null),
   english(Locale('en')),
-  spanish(Locale('es')),
   // gen-l10n emits Simplified Chinese as plain `zh` (from app_zh.arb), not
   // `zh-Hans`. Using `zh-Hans` here would hand MaterialApp a locale that is
   // not in AppLocalizations.supportedLocales.
   chineseSimplified(Locale('zh')),
-  chineseTraditional(Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'));
+  chineseTraditional(Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant')),
+  japanese(Locale('ja')),
+  korean(Locale('ko'));
 
   const AppLanguage(this.locale);
 

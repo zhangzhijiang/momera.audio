@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/audio_recording_service.dart';
+import '../../core/search/recording_search.dart';
 import '../../core/services/recording_session_channel.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/duration_format.dart';
@@ -23,6 +24,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final TextEditingController _searchController = TextEditingController();
   bool _isRecording = false;
   bool _isPaused = false;
   Duration _elapsed = Duration.zero;
@@ -42,6 +44,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _searchController.dispose();
     RecordingSessionChannel.setStopRequestedHandler(null);
     super.dispose();
   }
@@ -208,11 +211,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 error: (e, _) => Center(child: Text(l10n.loadFailed('$e'))),
                 data: (recordings) {
                   if (recordings.isEmpty) return const _EmptyState();
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: recordings.length,
-                    itemBuilder: (context, i) =>
-                        RecordingTile(recording: recordings[i]),
+
+                  final query = ref.watch(searchQueryProvider);
+                  final searching = query.trim().isNotEmpty;
+                  final hits = searching
+                      ? const RecordingSearch().search(recordings, query)
+                      : const <SearchHit>[];
+                  final visible = searching
+                      ? const RecordingSearch().filter(recordings, query)
+                      : recordings;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _SearchField(
+                        controller: _searchController,
+                        hint: l10n.searchHint,
+                        clearTooltip: l10n.clear,
+                        onChanged: (v) =>
+                            ref.read(searchQueryProvider.notifier).state = v,
+                      ),
+                      if (searching && visible.isEmpty)
+                        Expanded(
+                          child: _NoResults(
+                            message: l10n.searchNoResults(query),
+                            hint: l10n.searchNoResultsHint,
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            itemCount: visible.length,
+                            itemBuilder: (context, i) {
+                              final recording = visible[i];
+                              return RecordingTile(
+                                recording: recording,
+                                // Hits let the tile show where the words are
+                                // and seek playback to them.
+                                hits: [
+                                  for (final h in hits)
+                                    if (h.recording.path == recording.path) h,
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   );
                 },
               ),
@@ -370,6 +415,105 @@ class _EmptyState extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: AppTheme.textHint),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Search field pinned above the recording list.
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.hint,
+    required this.clearTooltip,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String clearTooltip;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(fontSize: 14, color: AppTheme.textHint),
+          prefixIcon:
+              const Icon(Icons.search_rounded, size: 20, color: AppTheme.textHint),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) {
+              if (value.text.isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.close_rounded,
+                    size: 18, color: AppTheme.textHint),
+                tooltip: clearTooltip,
+                onPressed: () {
+                  controller.clear();
+                  onChanged('');
+                },
+              );
+            },
+          ),
+          isDense: true,
+          filled: true,
+          fillColor: AppTheme.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoResults extends StatelessWidget {
+  const _NoResults({required this.message, required this.hint});
+
+  final String message;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off_rounded,
+                size: 48, color: AppTheme.textHint),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            // The most likely reason for a miss is not a typo but that the
+            // recording was never transcribed. Say so.
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: AppTheme.textHint),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -76,9 +76,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
-  String get languageSpanish => 'Español';
-
-  @override
   String get languageChineseSimplified => '简体中文';
 
   @override
@@ -229,6 +226,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get paused => '已暂停';
+
+  @override
+  String get languageJapanese => '日本語';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
+  String get searchHint => '搜索录音和转写文字';
+
+  @override
+  String searchNoResults(String query) {
+    return '没有匹配“$query”的结果。';
+  }
+
+  @override
+  String get searchNoResultsHint => '只有已转写的录音才能按说话内容搜索。';
+
+  @override
+  String searchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 条结果',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get searchMatchedName => '匹配到名称';
+
+  @override
+  String get clear => '清除';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -301,9 +331,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get languageEnglish => 'English';
-
-  @override
-  String get languageSpanish => 'Español';
 
   @override
   String get languageChineseSimplified => '简体中文';
@@ -456,4 +483,37 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get paused => '已暫停';
+
+  @override
+  String get languageJapanese => '日本語';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
+  String get searchHint => '搜尋錄音和轉寫文字';
+
+  @override
+  String searchNoResults(String query) {
+    return '沒有符合「$query」的結果。';
+  }
+
+  @override
+  String get searchNoResultsHint => '只有已轉寫的錄音才能依說話內容搜尋。';
+
+  @override
+  String searchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 筆結果',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get searchMatchedName => '符合名稱';
+
+  @override
+  String get clear => '清除';
 }

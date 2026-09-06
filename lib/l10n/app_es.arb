@@ -7,7 +7,6 @@
   "micPermissionRequired": "Se necesita permiso del micrófono para grabar.",
   "loadFailed": "Error al cargar: {error}",
   "transcribe": "Transcribir",
-  "transcribing": "Transcribiendo…",
   "deleteRecordingTitle": "¿Eliminar la grabación?",
   "deleteRecordingBody": "Esta acción no se puede deshacer.",
   "delete": "Eliminar",
@@ -33,10 +32,13 @@
   "settingsAutosaveInterval": "Intervalo de guardado automático",
   "settingsAutosaveIntervalSubtitle": "Con qué frecuencia se guarda en el disco la grabación en curso. Un fallo perderá como máximo esta cantidad de audio.",
   "seconds": "{count, plural, =1{1 segundo} other{{count} segundos}}",
-  "storageFullTitle": "Límite de almacenamiento alcanzado",
   "storageFullBody": "La grabación se detuvo porque tus grabaciones alcanzaron el límite de {limit}. Elimina algunas grabaciones o aumenta el límite en Ajustes.",
-  "recoveredRecordingTitle": "Grabación recuperada",
   "recoveredRecordingBody": "Se ha recuperado una grabación que se interrumpió.",
   "stop": "Detener",
-  "notificationRecording": "Grabación en curso"
+  "notificationRecording": "Grabación en curso",
+  "noSpeechDetected": "No se detectó voz en esta grabación.",
+  "modelNotReady": "El modelo de voz aún no está listo.",
+  "transcriptionFailed": "Error en la transcripción.",
+  "transcribingPercent": "Transcribiendo… {percent} %",
+  "playbackFailed": "No se pudo reproducir esta grabación."
 }

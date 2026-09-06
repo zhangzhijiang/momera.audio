@@ -7,7 +7,6 @@
   "micPermissionRequired": "录音需要麦克风权限。",
   "loadFailed": "加载失败：{error}",
   "transcribe": "转写文字",
-  "transcribing": "正在转写…",
   "deleteRecordingTitle": "删除这段录音？",
   "deleteRecordingBody": "此操作无法撤销。",
   "delete": "删除",
@@ -33,10 +32,13 @@
   "settingsAutosaveInterval": "自动保存间隔",
   "settingsAutosaveIntervalSubtitle": "正在录制的音频写入磁盘的频率。即使应用崩溃，最多也只会丢失这段时长的录音。",
   "seconds": "{count, plural, other{{count} 秒}}",
-  "storageFullTitle": "已达到存储上限",
   "storageFullBody": "录音已停止，因为录音总大小达到了 {limit} 的上限。请删除部分录音，或在设置中调高上限。",
-  "recoveredRecordingTitle": "已恢复录音",
   "recoveredRecordingBody": "已恢复一段中断的录音。",
   "stop": "停止",
-  "notificationRecording": "正在录音"
+  "notificationRecording": "正在录音",
+  "noSpeechDetected": "这段录音中没有检测到语音。",
+  "modelNotReady": "语音模型尚未准备好。",
+  "transcriptionFailed": "转写失败。",
+  "transcribingPercent": "正在转写… {percent}%",
+  "playbackFailed": "无法播放这段录音。"
 }

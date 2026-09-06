@@ -143,12 +143,6 @@ abstract class AppLocalizations {
   /// **'Transcribe'**
   String get transcribe;
 
-  /// No description provided for @transcribing.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcribing…'**
-  String get transcribing;
-
   /// No description provided for @deleteRecordingTitle.
   ///
   /// In en, this message translates to:
@@ -299,23 +293,11 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 second} other{{count} seconds}}'**
   String seconds(int count);
 
-  /// No description provided for @storageFullTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Storage limit reached'**
-  String get storageFullTitle;
-
   /// No description provided for @storageFullBody.
   ///
   /// In en, this message translates to:
   /// **'Recording stopped because your recordings reached the {limit} limit. Delete some recordings or raise the limit in Settings.'**
   String storageFullBody(String limit);
-
-  /// No description provided for @recoveredRecordingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovered a recording'**
-  String get recoveredRecordingTitle;
 
   /// No description provided for @recoveredRecordingBody.
   ///
@@ -334,6 +316,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recording in progress'**
   String get notificationRecording;
+
+  /// No description provided for @noSpeechDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech detected in this recording.'**
+  String get noSpeechDetected;
+
+  /// No description provided for @modelNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice model is not ready yet.'**
+  String get modelNotReady;
+
+  /// No description provided for @transcriptionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed.'**
+  String get transcriptionFailed;
+
+  /// No description provided for @transcribingPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing… {percent}%'**
+  String transcribingPercent(int percent);
+
+  /// No description provided for @playbackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not play this recording.'**
+  String get playbackFailed;
 }
 
 class _AppLocalizationsDelegate

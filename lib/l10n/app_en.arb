@@ -17,7 +17,6 @@
     }
   },
   "transcribe": "Transcribe",
-  "transcribing": "Transcribing…",
   "deleteRecordingTitle": "Delete recording?",
   "deleteRecordingBody": "This cannot be undone.",
   "delete": "Delete",
@@ -67,7 +66,6 @@
       }
     }
   },
-  "storageFullTitle": "Storage limit reached",
   "storageFullBody": "Recording stopped because your recordings reached the {limit} limit. Delete some recordings or raise the limit in Settings.",
   "@storageFullBody": {
     "placeholders": {
@@ -76,11 +74,22 @@
       }
     }
   },
-  "recoveredRecordingTitle": "Recovered a recording",
   "recoveredRecordingBody": "A recording that was interrupted has been recovered.",
   "stop": "Stop",
   "notificationRecording": "Recording in progress",
   "@notificationRecording": {
     "description": "Android foreground-service notification body while recording"
-  }
+  },
+  "noSpeechDetected": "No speech detected in this recording.",
+  "modelNotReady": "Voice model is not ready yet.",
+  "transcriptionFailed": "Transcription failed.",
+  "transcribingPercent": "Transcribing… {percent}%",
+  "@transcribingPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "playbackFailed": "Could not play this recording."
 }

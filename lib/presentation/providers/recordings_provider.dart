@@ -3,6 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/recording.dart';
 import 'service_providers.dart';
 
+/// Number of recordings recovered at startup after an interrupted session.
+///
+/// Read once by the home screen so the user is told why an unfamiliar recording
+/// appeared, rather than finding it silently. Reset to 0 after being shown.
+final recoveredCountProvider = StateProvider<int>((ref) => 0);
+
 /// The list of saved recordings, newest first. Reloads from disk via [refresh].
 class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
   @override
@@ -11,7 +17,11 @@ class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
     // interrupted by a crash, a force quit or the battery dying. Finalise those
     // into playable `.wav` files before listing, so the audio that was already
     // flushed to disk is never lost.
-    await ref.read(audioRecordingServiceProvider).recoverInterrupted();
+    final recovered =
+        await ref.read(audioRecordingServiceProvider).recoverInterrupted();
+    if (recovered.isNotEmpty) {
+      ref.read(recoveredCountProvider.notifier).state = recovered.length;
+    }
     return ref.read(recordingRepositoryProvider).list();
   }
 

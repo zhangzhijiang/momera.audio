@@ -32,9 +32,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get transcribe => '转写文字';
 
   @override
-  String get transcribing => '正在转写…';
-
-  @override
   String get deleteRecordingTitle => '删除这段录音？';
 
   @override
@@ -122,15 +119,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get storageFullTitle => '已达到存储上限';
-
-  @override
   String storageFullBody(String limit) {
     return '录音已停止，因为录音总大小达到了 $limit 的上限。请删除部分录音，或在设置中调高上限。';
   }
-
-  @override
-  String get recoveredRecordingTitle => '已恢复录音';
 
   @override
   String get recoveredRecordingBody => '已恢复一段中断的录音。';
@@ -140,6 +131,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get notificationRecording => '正在录音';
+
+  @override
+  String get noSpeechDetected => '这段录音中没有检测到语音。';
+
+  @override
+  String get modelNotReady => '语音模型尚未准备好。';
+
+  @override
+  String get transcriptionFailed => '转写失败。';
+
+  @override
+  String transcribingPercent(int percent) {
+    return '正在转写… $percent%';
+  }
+
+  @override
+  String get playbackFailed => '无法播放这段录音。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -168,9 +176,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get transcribe => '轉寫文字';
-
-  @override
-  String get transcribing => '正在轉寫…';
 
   @override
   String get deleteRecordingTitle => '刪除這段錄音？';
@@ -260,15 +265,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get storageFullTitle => '已達到儲存上限';
-
-  @override
   String storageFullBody(String limit) {
     return '錄音已停止，因為錄音總大小達到了 $limit 的上限。請刪除部分錄音，或在設定中調高上限。';
   }
-
-  @override
-  String get recoveredRecordingTitle => '已復原錄音';
 
   @override
   String get recoveredRecordingBody => '已復原一段中斷的錄音。';
@@ -278,4 +277,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get notificationRecording => '正在錄音';
+
+  @override
+  String get noSpeechDetected => '這段錄音中沒有偵測到語音。';
+
+  @override
+  String get modelNotReady => '語音模型尚未準備好。';
+
+  @override
+  String get transcriptionFailed => '轉寫失敗。';
+
+  @override
+  String transcribingPercent(int percent) {
+    return '正在轉寫… $percent%';
+  }
+
+  @override
+  String get playbackFailed => '無法播放這段錄音。';
 }

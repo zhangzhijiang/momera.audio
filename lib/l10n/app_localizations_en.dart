@@ -33,9 +33,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transcribe => 'Transcribe';
 
   @override
-  String get transcribing => 'Transcribing…';
-
-  @override
   String get deleteRecordingTitle => 'Delete recording?';
 
   @override
@@ -126,15 +123,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get storageFullTitle => 'Storage limit reached';
-
-  @override
   String storageFullBody(String limit) {
     return 'Recording stopped because your recordings reached the $limit limit. Delete some recordings or raise the limit in Settings.';
   }
-
-  @override
-  String get recoveredRecordingTitle => 'Recovered a recording';
 
   @override
   String get recoveredRecordingBody =>
@@ -145,4 +136,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationRecording => 'Recording in progress';
+
+  @override
+  String get noSpeechDetected => 'No speech detected in this recording.';
+
+  @override
+  String get modelNotReady => 'Voice model is not ready yet.';
+
+  @override
+  String get transcriptionFailed => 'Transcription failed.';
+
+  @override
+  String transcribingPercent(int percent) {
+    return 'Transcribing… $percent%';
+  }
+
+  @override
+  String get playbackFailed => 'Could not play this recording.';
 }

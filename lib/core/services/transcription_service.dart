@@ -23,6 +23,11 @@ class TranscriptionService {
   static const int _sampleRate = 16000;
   static const int _vadWindowSamples = 512; // Silero VAD window size
 
+  /// VAD windows to process between yields to the event loop. 512 samples is
+  /// 32 ms of audio, so this is roughly a second of audio per yield — often
+  /// enough to keep the UI smooth, rare enough not to dominate the run.
+  static const int _yieldThreshold = 32;
+
   sherpa_onnx.OfflineRecognizer? _recognizer;
   sherpa_onnx.VoiceActivityDetector? _vad;
 
@@ -79,7 +84,19 @@ class TranscriptionService {
   }
 
   /// Transcribe a 16 kHz mono PCM16 WAV file and return the recognized text.
-  Future<String> transcribeFile(String wavPath) async {
+  ///
+  /// [onProgress] is called with a value in [0.0, 1.0] as the audio is consumed.
+  ///
+  /// The VAD feed and the decode both run on the calling isolate — sherpa_onnx
+  /// holds native pointers that are not shareable across isolates, and the
+  /// model is far too expensive to load per transcription. Instead the loop
+  /// yields to the event loop regularly, so the UI keeps painting (a progress
+  /// spinner that cannot animate is worse than no spinner) and the app stays
+  /// responsive to taps.
+  Future<String> transcribeFile(
+    String wavPath, {
+    void Function(double progress)? onProgress,
+  }) async {
     if (!isInitialized) await initialize();
 
     final bytes = await File(wavPath).readAsBytes();
@@ -94,6 +111,7 @@ class TranscriptionService {
     // Feed the audio to the VAD in fixed windows and transcribe each completed
     // speech segment.
     int offset = 0;
+    int sinceYield = 0;
     while (offset + _vadWindowSamples <= samples.length) {
       final window =
           Float32List.sublistView(samples, offset, offset + _vadWindowSamples);
@@ -101,8 +119,18 @@ class TranscriptionService {
       while (!vad.isEmpty()) {
         _appendSegment(vad.front().samples, buffer);
         vad.pop();
+        // Decoding a segment is the expensive step; always yield after one.
+        sinceYield = _yieldThreshold;
       }
       offset += _vadWindowSamples;
+
+      sinceYield++;
+      if (sinceYield >= _yieldThreshold) {
+        sinceYield = 0;
+        onProgress?.call(offset / samples.length);
+        // Hand the event loop a turn so the UI can paint.
+        await Future<void>.delayed(Duration.zero);
+      }
     }
 
     // Flush any trailing speech the VAD has not yet emitted.
@@ -110,8 +138,10 @@ class TranscriptionService {
     while (!vad.isEmpty()) {
       _appendSegment(vad.front().samples, buffer);
       vad.pop();
+      await Future<void>.delayed(Duration.zero);
     }
 
+    onProgress?.call(1.0);
     return buffer.toString().trim();
   }
 

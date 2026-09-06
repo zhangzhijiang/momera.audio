@@ -7,7 +7,6 @@
   "micPermissionRequired": "錄音需要麥克風權限。",
   "loadFailed": "載入失敗：{error}",
   "transcribe": "轉寫文字",
-  "transcribing": "正在轉寫…",
   "deleteRecordingTitle": "刪除這段錄音？",
   "deleteRecordingBody": "此操作無法復原。",
   "delete": "刪除",
@@ -33,10 +32,13 @@
   "settingsAutosaveInterval": "自動儲存間隔",
   "settingsAutosaveIntervalSubtitle": "正在錄製的音訊寫入磁碟的頻率。即使應用程式當機，最多也只會遺失這段時長的錄音。",
   "seconds": "{count, plural, other{{count} 秒}}",
-  "storageFullTitle": "已達到儲存上限",
   "storageFullBody": "錄音已停止，因為錄音總大小達到了 {limit} 的上限。請刪除部分錄音，或在設定中調高上限。",
-  "recoveredRecordingTitle": "已復原錄音",
   "recoveredRecordingBody": "已復原一段中斷的錄音。",
   "stop": "停止",
-  "notificationRecording": "正在錄音"
+  "notificationRecording": "正在錄音",
+  "noSpeechDetected": "這段錄音中沒有偵測到語音。",
+  "modelNotReady": "語音模型尚未準備好。",
+  "transcriptionFailed": "轉寫失敗。",
+  "transcribingPercent": "正在轉寫… {percent}%",
+  "playbackFailed": "無法播放這段錄音。"
 }

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/audio_recording_service.dart';
 import '../../core/services/recording_session_channel.dart';
 import '../../core/utils/app_theme.dart';
+import '../../core/utils/duration_format.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
@@ -129,16 +130,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  String _formatElapsed(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
     final recordingsAsync = ref.watch(recordingsProvider);
     final l10n = AppLocalizations.of(context)!;
+
+    // A recording recovered from an interrupted session should be explained,
+    // not just silently appear in the list.
+    ref.listen<int>(recoveredCountProvider, (previous, count) {
+      if (count <= 0) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.recoveredRecordingBody),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      ref.read(recoveredCountProvider.notifier).state = 0;
+    });
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -192,7 +200,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _RecordBar(
               tapToRecordLabel: l10n.tapToRecord,
               isRecording: _isRecording,
-              elapsedLabel: _formatElapsed(_elapsed),
+              elapsedLabel: formatDuration(_elapsed),
               onTap: _toggleRecording,
             ),
           ],

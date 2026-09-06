@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../core/services/transcription_service.dart';
 import '../../core/utils/app_theme.dart';
+import '../../core/utils/duration_format.dart';
 import '../../data/models/recording.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/recordings_provider.dart';
@@ -31,6 +32,7 @@ class RecordingTile extends ConsumerStatefulWidget {
 
 class _RecordingTileState extends ConsumerState<RecordingTile> {
   bool _transcribing = false;
+  double _progress = 0;
 
   Recording get _recording => widget.recording;
 
@@ -40,6 +42,7 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
   }
 
   Future<void> _togglePlay() async {
+    final l10n = AppLocalizations.of(context)!;
     final playback = ref.read(audioPlaybackServiceProvider);
     if (_isThisPlaying && playback.isPlaying) {
       await playback.pause();
@@ -49,13 +52,16 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
       try {
         await playback.play(_recording.path);
       } catch (_) {
-        if (mounted) _showSnack('Could not play this recording.');
+        if (mounted) _showSnack(l10n.playbackFailed);
       }
     }
     if (mounted) setState(() {});
   }
 
   Future<void> _transcribe() async {
+    // Captured before the first await: reading it after an async gap risks a
+    // deactivated context.
+    final l10n = AppLocalizations.of(context)!;
     final service = ref.read(transcriptionServiceProvider);
 
     // Ensure the model is downloaded + the service initialized.
@@ -65,19 +71,27 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
       if (ok != true) return;
     }
 
-    setState(() => _transcribing = true);
+    setState(() {
+      _transcribing = true;
+      _progress = 0;
+    });
     try {
-      final text = await service.transcribeFile(_recording.path);
+      final text = await service.transcribeFile(
+        _recording.path,
+        onProgress: (p) {
+          if (mounted) setState(() => _progress = p);
+        },
+      );
       await ref
           .read(recordingsProvider.notifier)
           .setTranscript(_recording, text);
       if (mounted && text.isEmpty) {
-        _showSnack('No speech detected in this recording.');
+        _showSnack(l10n.noSpeechDetected);
       }
     } on ModelNotReadyException {
-      if (mounted) _showSnack('Voice model is not ready yet.');
+      if (mounted) _showSnack(l10n.modelNotReady);
     } catch (_) {
-      if (mounted) _showSnack('Transcription failed.');
+      if (mounted) _showSnack(l10n.transcriptionFailed);
     } finally {
       if (mounted) setState(() => _transcribing = false);
     }
@@ -111,13 +125,6 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  String _formatDuration(Duration? d) {
-    if (d == null) return '--:--';
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 
   @override
@@ -166,7 +173,7 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _formatDuration(r.duration),
+                      formatDuration(r.duration),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -208,14 +215,20 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
               child: TextButton.icon(
                 onPressed: _transcribing ? null : _transcribe,
                 icon: _transcribing
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          // Determinate once there is progress to show, so a
+                          // long transcription visibly advances.
+                          value: _progress > 0 ? _progress : null,
+                        ),
                       )
                     : const Icon(Icons.graphic_eq_rounded, size: 18),
                 label: Text(_transcribing
-                    ? AppLocalizations.of(context)!.transcribing
+                    ? AppLocalizations.of(context)!
+                        .transcribingPercent((_progress * 100).round())
                     : AppLocalizations.of(context)!.transcribe),
                 style: TextButton.styleFrom(
                   foregroundColor: AppTheme.accent,

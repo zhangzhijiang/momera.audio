@@ -60,6 +60,20 @@ class RecordingRepository {
     return recordings;
   }
 
+  /// Total bytes occupied by recordings and their transcript sidecars.
+  ///
+  /// Used to enforce the storage cap from settings, and to show usage on the
+  /// settings screen.
+  Future<int> totalBytes() async {
+    final dir = await directory();
+    var total = 0;
+    await for (final entry in dir.list()) {
+      if (entry is! File) continue;
+      total += await entry.length();
+    }
+    return total;
+  }
+
   /// Delete a recording's audio file and its transcript sidecar.
   Future<void> delete(Recording recording) async {
     final audio = File(recording.path);

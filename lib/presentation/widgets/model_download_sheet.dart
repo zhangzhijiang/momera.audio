@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/transcription_provider.dart';
 
 /// Bottom sheet that prompts the user to download the offline speech-to-text
@@ -27,6 +28,7 @@ class _ModelDownloadSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     ref.listen<ModelDownloadData>(modelDownloadProvider, (prev, next) {
       if (next.state == ModelDownloadState.ready && Navigator.canPop(context)) {
         Navigator.of(context).pop(true);
@@ -63,10 +65,10 @@ class _ModelDownloadSheet extends ConsumerWidget {
                       color: AppTheme.accent, size: 22),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Download voice model',
-                    style: TextStyle(
+                    l10n.downloadModelTitle,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textPrimary,
@@ -78,9 +80,7 @@ class _ModelDownloadSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Transcription runs fully offline. The speech model '
-              '(${_formatMb(notifier.downloadBytes)}) is downloaded once and '
-              'reused for every recording.',
+              l10n.downloadModelBody(_formatMb(notifier.downloadBytes)),
               style: const TextStyle(
                 fontSize: 14,
                 height: 1.4,
@@ -113,7 +113,7 @@ class _ModelDownloadSheet extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    'Download failed. Check your connection and try again.',
+                    l10n.downloadFailed,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.red.shade400,
@@ -133,7 +133,7 @@ class _ModelDownloadSheet extends ConsumerWidget {
                   ),
                   onPressed: notifier.downloadAndInitialize,
                   child: Text(
-                    isError ? 'Retry' : 'Download',
+                    isError ? l10n.retry : l10n.download,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,

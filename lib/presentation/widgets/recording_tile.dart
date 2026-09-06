@@ -6,11 +6,20 @@ import 'package:just_audio/just_audio.dart';
 import '../../core/services/transcription_service.dart';
 import '../../core/utils/app_theme.dart';
 import '../../data/models/recording.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
 import 'model_download_sheet.dart';
 
 /// A single recording row: play/pause, metadata, transcript, and actions.
+/// Date + time in the active locale. A hardcoded `DateFormat` pattern would
+/// print English month names regardless of the chosen UI language.
+String _formatCreatedAt(BuildContext context, DateTime when) {
+  final tag = Localizations.localeOf(context).toLanguageTag();
+  return '${DateFormat.yMMMd(tag).format(when)} · '
+      '${DateFormat.jm(tag).format(when)}';
+}
+
 class RecordingTile extends ConsumerStatefulWidget {
   const RecordingTile({super.key, required this.recording});
 
@@ -78,16 +87,16 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete recording?'),
-        content: const Text('This cannot be undone.'),
+        title: Text(AppLocalizations.of(ctx)!.deleteRecordingTitle),
+        content: Text(AppLocalizations.of(ctx)!.deleteRecordingBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(ctx)!.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete',
+            child: Text(AppLocalizations.of(ctx)!.delete,
                 style: TextStyle(color: Colors.red.shade400)),
           ),
         ],
@@ -148,7 +157,7 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      DateFormat('MMM d, yyyy · h:mm a').format(r.createdAt),
+                      _formatCreatedAt(context, r.createdAt),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -170,7 +179,7 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                 icon: const Icon(Icons.delete_outline_rounded,
                     size: 20, color: AppTheme.textHint),
                 onPressed: _confirmDelete,
-                tooltip: 'Delete',
+                tooltip: AppLocalizations.of(context)!.delete,
               ),
             ],
           ),
@@ -205,7 +214,9 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.graphic_eq_rounded, size: 18),
-                label: Text(_transcribing ? 'Transcribing…' : 'Transcribe'),
+                label: Text(_transcribing
+                    ? AppLocalizations.of(context)!.transcribing
+                    : AppLocalizations.of(context)!.transcribe),
                 style: TextButton.styleFrom(
                   foregroundColor: AppTheme.accent,
                   padding: const EdgeInsets.symmetric(horizontal: 8),

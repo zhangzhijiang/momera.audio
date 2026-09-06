@@ -4,7 +4,7 @@ Ordered so nothing below the blockers can usefully be started first.
 The *why* for every configuration choice is in
 [`release_guide.md`](release_guide.md).
 
-**Last verified: 2026-09-05** against version `1.0.0+1`.
+**Last verified: 2026-09-05** against version `1.0.0+2`.
 
 ---
 
@@ -89,10 +89,10 @@ re-prove it after any change, not because anything is outstanding.
 
 ### Still on a placeholder
 
-- [ ] **Version is `1.0.0+1`.** Fine for the first submission. Remember that
+- [ ] **Version is `1.0.0+2`.** Fine for the first submission. Remember that
       **App Store Connect reserves a build number permanently, even if you
       delete the build** — a failed upload means bump the *build* number
-      (`1.0.0+2`), not the version.
+      (to `1.0.0+3`, and so on), not the version.
 
 ---
 
@@ -131,9 +131,12 @@ screenshots in every language, the description, subtitle, promotional text,
 keywords, What's New, and the App Store Connect submission answers. Do not write
 listing copy here.
 
-Two facts it will need from this port:
+Three facts it will need from this port:
 
 - **iPhone only** — no iPad screenshots required. `TARGETED_DEVICE_FAMILY = "1"`.
+- **Four languages ship: English, Spanish, Simplified Chinese, Traditional
+  Chinese.** Screenshots and listing copy are needed for all four, not English
+  alone.
 - **App Privacy: nothing is collected.** No data leaves the device; transcription
   is fully on-device. There must be **no** "Data Used to Track You" section.
 
@@ -173,6 +176,11 @@ build and should be exercised on a device.
 | `lib/presentation/screens/home_screen.dart` | **The bottom record bar now spans the full screen width** (it was collapsing to a narrow card). Purely visual, and it is the intended design — but eyeball it. |
 | `pubspec.yaml` | `permission_handler` removed. It was never imported anywhere, so no runtime effect is expected — confirm the mic permission flow still works, since `record` handles it natively. |
 | `pubspec.yaml` (icons) | iOS icon generation enabled. All 10 Android PNGs verified **byte-identical** by checksum — no Android icon change. |
+| `lib/main.dart` | Now resolves and applies a UI locale. Android picks up the device language; verify a Chinese device shows the right script. |
+| `lib/presentation/screens/home_screen.dart` (settings action) | New gear icon in the app bar opening the settings screen. |
+| `lib/presentation/widgets/recording_tile.dart` | **Dates are now locale-formatted** rather than a hardcoded English pattern. An English device should look unchanged; a Chinese or Spanish device will show localised dates. |
+| `lib/presentation/widgets/model_download_sheet.dart` | Strings localised only; no behaviour change. |
+| `pubspec.yaml` (`shared_preferences`, `flutter_localizations`) | New plugins. `shared_preferences` adds an Android SharedPreferences dependency; settings must persist across a cold start. |
 | `.metadata` | Tooling metadata only, no runtime effect. |
 
 Android re-test list:
@@ -182,6 +190,9 @@ Android re-test list:
 - [ ] Transcription end to end
 - [ ] Microphone permission on a fresh install
 - [ ] Bottom bar renders full-width and looks right
+- [ ] Settings persist across a force-quit and relaunch
+- [ ] Switching UI language takes effect immediately and survives a relaunch
+- [ ] A device set to Chinese shows the correct script (Simplified vs Traditional)
 
 Android gate, re-run after **every** change (not once at the end):
 
@@ -192,12 +203,22 @@ flutter build appbundle --release
 git status --short lib/ android/
 ```
 
-Last run 2026-09-05: analyze clean, 1/1 tests pass,
-`✓ Built app-release.aab (95.4MB)`.
+Last run 2026-09-05: analyze clean, **14/14 tests pass**,
+`✓ Built app-release.aab (97.7MB)`.
 
 ---
 
-## 7. Not yet done — background recording
+## 7. Not yet done — the settings that do nothing
+
+**`Maximum storage` and `Auto-save interval` are shown in the settings UI but
+are not enforced anywhere.** Nothing in the recording pipeline reads them. They
+become live with the background-recording work below. Shipping them inert means
+shipping controls that silently do nothing — finish the feature, or hide these
+two rows before submitting.
+
+---
+
+## 8. Not yet done — background recording
 
 `UIBackgroundModes: [audio]` **is already declared in `Info.plist`, but the
 feature is not implemented.** Apple rejects apps that declare a background mode

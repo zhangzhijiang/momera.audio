@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations: # UI in English, Spanish, Simplified & Traditional Chinese
+    sdk: flutter
 
   # State management
   flutter_riverpod: ^2.5.1
@@ -27,6 +29,7 @@ dependencies:
   path: ^1.9.0
   http: ^1.2.0 # downloads the SenseVoice model at runtime
   intl: ^0.20.2
+  shared_preferences: ^2.3.2 # persists the settings screen's choices
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +39,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true # builds AppLocalizations from lib/l10n/*.arb
 
   assets:
     # NOTE: model.int8.onnx (~228 MB) is intentionally NOT bundled. It is

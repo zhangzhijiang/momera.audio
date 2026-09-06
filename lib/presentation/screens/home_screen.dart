@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
 import '../widgets/record_button.dart';
 import '../widgets/recording_tile.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -45,8 +47,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (path == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Microphone permission is required to record.'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.micPermissionRequired),
         ),
       );
       return;
@@ -70,13 +72,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final recordingsAsync = ref.watch(recordingsProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text(
-          'Momera.Audio',
-          style: TextStyle(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined,
+                color: AppTheme.textSecondary),
+            tooltip: l10n.settings,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
+              ),
+            ),
+          ),
+        ],
+        title: Text(
+          l10n.appTitle,
+          style: const TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w800,
             color: AppTheme.textPrimary,
@@ -96,7 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: recordingsAsync.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Failed to load: $e')),
+                error: (e, _) => Center(child: Text(l10n.loadFailed('$e'))),
                 data: (recordings) {
                   if (recordings.isEmpty) return const _EmptyState();
                   return ListView.builder(
@@ -109,6 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             _RecordBar(
+              tapToRecordLabel: l10n.tapToRecord,
               isRecording: _isRecording,
               elapsedLabel: _formatElapsed(_elapsed),
               onTap: _toggleRecording,
@@ -122,11 +138,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 class _RecordBar extends StatelessWidget {
   const _RecordBar({
+    required this.tapToRecordLabel,
     required this.isRecording,
     required this.elapsedLabel,
     required this.onTap,
   });
 
+  final String tapToRecordLabel;
   final bool isRecording;
   final String elapsedLabel;
   final VoidCallback onTap;
@@ -161,9 +179,9 @@ class _RecordBar extends StatelessWidget {
                       ),
                     ],
                   )
-                : const Text(
-                    'Tap to record',
-                    style: TextStyle(
+                : Text(
+                    tapToRecordLabel,
+                    style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.textSecondary,
                     ),
@@ -198,24 +216,25 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.mic_none_rounded, size: 56, color: AppTheme.textHint),
-          SizedBox(height: 12),
+          const Icon(Icons.mic_none_rounded, size: 56, color: AppTheme.textHint),
+          const SizedBox(height: 12),
           Text(
-            'No recordings yet',
-            style: TextStyle(
+            l10n.noRecordingsTitle,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppTheme.textSecondary,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
-            'Tap the record button to capture audio.',
-            style: TextStyle(fontSize: 13, color: AppTheme.textHint),
+            l10n.noRecordingsBody,
+            style: const TextStyle(fontSize: 13, color: AppTheme.textHint),
           ),
         ],
       ),

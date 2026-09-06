@@ -18,7 +18,7 @@ that date and its real output recorded.
 | Analyzer | `flutter analyze` | ✅ No issues found |
 | Tests | `flutter test` | ✅ 1/1 passed |
 
-Version is `1.0.0+1` (`pubspec.yaml`). Neither store has a released build yet.
+Version is `1.0.0+2` (`pubspec.yaml`). Neither store has a released build yet.
 
 > **Android release signing was broken before this port started.**
 > `android/key.properties` carried a Windows path
@@ -45,7 +45,7 @@ here, the answer is yes.
 | Signing | Upload keystore via `android/key.properties` | Automatic, `DEVELOPMENT_TEAM = 6ZWZ3Z58ZT` | Platform mechanics. |
 | Model storage | app support dir | `Library/Application Support` | Same Dart call, `getApplicationSupportDirectory()`. Listed only because the *reason* is iOS-specific — see below. |
 | Backup exclusion | no-op | `NSURLIsExcludedFromBackupKey` via method channel | Android has no iCloud backup of app-private files to opt out of. The Dart side branches on `defaultTargetPlatform` and returns early. |
-| Privacy manifest | n/a | `ios/Runner/PrivacyInfo.xcprivacy` | Apple-only requirement. |
+| Privacy manifest | n/a | `ios/Runner/PrivacyInfo.xcprivacy` | Apple-only requirement. `shared_preferences_foundation` ships its own manifest declaring UserDefaults access (reason `1C8F.1`) with tracking false; Xcode unions SDK manifests, so ours needs no UserDefaults entry. |
 | Background audio | *not yet implemented* | `UIBackgroundModes: [audio]` declared | See "Known gaps". |
 | Device family | phones + tablets (no restriction) | `TARGETED_DEVICE_FAMILY = "1"` (iPhone only) | Deliberate for v1 — see below. Android has no equivalent gate; the same APK runs on tablets. |
 | Architectures | `arm64-v8a`, `x86_64` | device `arm64` | `x86_64` is kept on Android for emulator debug builds. |
@@ -71,19 +71,22 @@ here, the answer is yes.
 `IPHONEOS_DEPLOYMENT_TARGET = 13.0`, set in `ios/Runner.xcodeproj/project.pbxproj`
 (all three configurations) and `ios/Podfile`.
 
-**It is 13.0 because of exactly one plugin: `sherpa_onnx_ios`.**
+**Two plugins independently require 13.0.**
 
 | Plugin | iOS floor |
 |---|---|
 | **`sherpa_onnx_ios` 1.13.2** | **13.0** ← binding constraint |
+| **`shared_preferences_foundation` 2.5.7** | **13.0** ← also binding |
 | `record_ios` 1.2.1 | 12.0 |
 | `just_audio` 0.10.5 | 12.0 |
 | `audio_session` 0.2.3 | 12.0 |
 | `permission_handler_apple` | 12.0 *(dependency since removed)* |
 
-**The runner-up is 12.0.** If `sherpa_onnx_ios` ever relaxes its floor, or the
-speech engine is replaced, the target can drop straight to 12.0 with no other
-change. Nothing else in the project needs 13.0.
+**The runner-up is 12.0**, but getting there now needs *both* constraints gone.
+Originally only `sherpa_onnx_ios` held the floor; `shared_preferences_foundation`
+arrived with the settings screen and requires 13.0 too. So replacing the speech
+engine alone would no longer let the target drop — settings persistence would
+have to move to a plain JSON file via `path_provider` as well.
 
 Do not raise it "to be safe" — every bump drops real devices. Raise it only when
 `pod install` actually fails and names the plugin that demands it.
@@ -327,3 +330,63 @@ Fixed with `crossAxisAlignment: CrossAxisAlignment.stretch` on the body
 **Android runtime impact: the bottom bar now spans the screen width.** That is
 the intended design and no shipped release ever showed the broken version, but
 it is a visible change to the Android UI and should be eyeballed on a device.
+
+
+---
+
+## Settings screen and localization
+
+Added after the port proper. Four UI languages ship: **English, Spanish,
+Simplified Chinese, Traditional Chinese**.
+
+### How the locales are wired
+
+Translations live in `lib/l10n/*.arb` and are code-generated into
+`lib/l10n/app_localizations.dart` by `flutter gen-l10n`, driven by `l10n.yaml`
+and `generate: true` in `pubspec.yaml`. The generated files are committed.
+
+**Simplified Chinese is plain `zh`, not `zh-Hans`.** gen-l10n derives the locale
+from the ARB filename, so `app_zh.arb` becomes `Locale('zh')` while
+`app_zh_Hant.arb` becomes `Locale.fromSubtags(languageCode: 'zh', scriptCode:
+'Hant')`. `AppLanguage.chineseSimplified` must therefore use `Locale('zh')` —
+using `zh-Hans` hands `MaterialApp` a locale absent from
+`AppLocalizations.supportedLocales`. There is a test pinning this.
+
+`MomeraAudioApp.resolveLocale` handles device locales we do not translate
+exactly:
+
+- **Chinese is matched first, before the generic exact match.** This is not
+  cosmetic ordering. Since Simplified is plain `zh` with a null script code, a
+  device set to `zh-TW` matches `zh` on language *and* script (both null) and
+  would be served **Simplified text on a Traditional device**. That bug was
+  written, caught by a test, and fixed — do not "simplify" this ordering.
+- `zh-HK`, `zh-MO`, `zh-TW` and any `Hant` script → Traditional. All other
+  Chinese → Simplified.
+- Regional variants fall back to the base language (`es-MX` → `es`).
+- Anything untranslated, or a null device locale, falls back to English.
+
+### Settings
+
+Persisted with `shared_preferences`; reads are defensive so a corrupt or
+missing value falls back to the default rather than throwing at launch.
+
+| Setting | Default | Notes |
+|---|---|---|
+| Language | System | Falls back to English for untranslated device languages |
+| Maximum storage | 2 GB | ~18 h at 16 kHz mono PCM16 (~1.83 MB/min) |
+| Auto-save interval | 10 s | A crash loses at most this much audio |
+
+The settings screen also shows current usage against the cap — a limit with no
+visible usage figure is hard to set sensibly.
+
+> **The storage cap and auto-save interval are stored and displayed but not yet
+> enforced.** Nothing in the recording pipeline reads either value. They become
+> live as part of the background-recording work. Until then they are inert
+> preferences, which is a UI-honesty problem: the app shows controls that do
+> nothing.
+
+### Consequence for the store listing
+
+The app now ships in four languages, so `/idatagear-apple-store-assets` must
+produce screenshots and listing copy for **en, es, zh-Hans, zh-Hant** — not
+English alone.

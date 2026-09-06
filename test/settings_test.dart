@@ -5,6 +5,7 @@ import 'package:momera_audio/data/models/app_settings.dart';
 import 'package:momera_audio/l10n/app_localizations.dart';
 import 'package:momera_audio/main.dart';
 import 'package:momera_audio/presentation/screens/settings_screen.dart';
+import 'package:momera_audio/presentation/widgets/recording_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -93,6 +94,20 @@ void main() {
 
     test('renders sub-gigabyte sizes in megabytes', () {
       expect(formatBytes(512 * 1024 * 1024), '512 MB');
+    });
+  });
+
+  group('formatCreatedAt', () {
+    test('is fixed yyyy-MM-dd HH:mm:ss, 24-hour', () {
+      expect(
+        formatCreatedAt(DateTime(2026, 9, 5, 16, 7, 3)),
+        '2026-09-05 16:07:03',
+      );
+      // Afternoon times must not render as 12-hour with AM/PM.
+      expect(formatCreatedAt(DateTime(2026, 1, 2, 23, 59, 59)),
+          '2026-01-02 23:59:59');
+      expect(formatCreatedAt(DateTime(2026, 12, 31, 0, 0, 0)),
+          '2026-12-31 00:00:00');
     });
   });
 

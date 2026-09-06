@@ -1,16 +1,21 @@
 {
   "@@locale": "en",
-
   "appTitle": "Momera.Audio",
-  "@appTitle": { "description": "Application name, shown in the app bar" },
-
+  "@appTitle": {
+    "description": "Application name, shown in the app bar"
+  },
   "tapToRecord": "Tap to record",
   "noRecordingsTitle": "No recordings yet",
   "noRecordingsBody": "Tap the record button to capture audio.",
   "micPermissionRequired": "Microphone permission is required to record.",
   "loadFailed": "Failed to load: {error}",
-  "@loadFailed": { "placeholders": { "error": { "type": "String" } } },
-
+  "@loadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "transcribe": "Transcribe",
   "transcribing": "Transcribing…",
   "deleteRecordingTitle": "Delete recording?",
@@ -18,13 +23,17 @@
   "delete": "Delete",
   "cancel": "Cancel",
   "retry": "Retry",
-
   "downloadModelTitle": "Download voice model",
   "downloadModelBody": "Transcription runs fully offline. The speech model ({size}) is downloaded once and kept on this device.",
-  "@downloadModelBody": { "placeholders": { "size": { "type": "String" } } },
+  "@downloadModelBody": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "download": "Download",
   "downloadFailed": "Download failed. Check your connection and try again.",
-
   "settings": "Settings",
   "settingsLanguage": "Language",
   "settingsLanguageSubtitle": "Language used throughout the app",
@@ -33,25 +42,45 @@
   "languageSpanish": "Español",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
-
   "settingsStorage": "Storage",
   "settingsMaxStorage": "Maximum storage",
   "settingsMaxStorageSubtitle": "Recording stops when your recordings reach this size.",
   "settingsStorageUsed": "{used} of {total} used",
   "@settingsStorageUsed": {
-    "placeholders": { "used": { "type": "String" }, "total": { "type": "String" } }
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
   },
-
   "settingsRecording": "Recording",
   "settingsAutosaveInterval": "Auto-save interval",
   "settingsAutosaveIntervalSubtitle": "How often the recording in progress is written to disk. A crash loses at most this much audio.",
   "seconds": "{count, plural, =1{1 second} other{{count} seconds}}",
-  "@seconds": { "placeholders": { "count": { "type": "int" } } },
-
+  "@seconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "storageFullTitle": "Storage limit reached",
   "storageFullBody": "Recording stopped because your recordings reached the {limit} limit. Delete some recordings or raise the limit in Settings.",
-  "@storageFullBody": { "placeholders": { "limit": { "type": "String" } } },
-
+  "@storageFullBody": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
   "recoveredRecordingTitle": "Recovered a recording",
-  "recoveredRecordingBody": "A recording that was interrupted has been recovered."
+  "recoveredRecordingBody": "A recording that was interrupted has been recovered.",
+  "stop": "Stop",
+  "notificationRecording": "Recording in progress",
+  "@notificationRecording": {
+    "description": "Android foreground-service notification body while recording"
+  }
 }

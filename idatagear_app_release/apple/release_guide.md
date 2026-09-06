@@ -46,7 +46,7 @@ here, the answer is yes.
 | Model storage | app support dir | `Library/Application Support` | Same Dart call, `getApplicationSupportDirectory()`. Listed only because the *reason* is iOS-specific — see below. |
 | Backup exclusion | no-op | `NSURLIsExcludedFromBackupKey` via method channel | Android has no iCloud backup of app-private files to opt out of. The Dart side branches on `defaultTargetPlatform` and returns early. |
 | Privacy manifest | n/a | `ios/Runner/PrivacyInfo.xcprivacy` | Apple-only requirement. `shared_preferences_foundation` ships its own manifest declaring UserDefaults access (reason `1C8F.1`) with tracking false; Xcode unions SDK manifests, so ours needs no UserDefaults entry. |
-| Background audio | *not yet implemented* | `UIBackgroundModes: [audio]` declared | See "Known gaps". |
+| Background recording | Foreground service (`RecordingService.kt`) with a persistent notification | `UIBackgroundModes: [audio]` + the plugin's AVAudioSession | Entirely different platform mechanisms for the same behaviour. Android *requires* a visible notification; iOS shows its own indicator and needs no UI. |
 | Device family | phones + tablets (no restriction) | `TARGETED_DEVICE_FAMILY = "1"` (iPhone only) | Deliberate for v1 — see below. Android has no equivalent gate; the same APK runs on tablets. |
 | Architectures | `arm64-v8a`, `x86_64` | device `arm64` | `x86_64` is kept on Android for emulator debug builds. |
 
@@ -262,12 +262,6 @@ shows progress — a reviewer who thinks the app has hung will reject it.
 
 ## Known gaps
 
-- **Background recording is declared but not implemented.**
-  `UIBackgroundModes: [audio]` is in `Info.plist`, but the app does not
-  currently configure an audio session to keep recording when backgrounded, and
-  Android has no foreground service. **This combination is itself a review
-  risk**: Apple rejects apps that declare a background mode they do not use.
-  Either finish the feature or remove the key before submitting.
 - **Transcription runs on the main isolate.**
   `TranscriptionService.transcribeFile()` does the whole VAD + decode loop
   inline, blocking the UI thread for the duration. On a long recording this
@@ -390,3 +384,99 @@ visible usage figure is hard to set sensibly.
 The app now ships in four languages, so `/idatagear-apple-store-assets` must
 produce screenshots and listing copy for **en, es, zh-Hans, zh-Hant** — not
 English alone.
+
+
+---
+
+## Background recording
+
+Recording continues while the app is backgrounded **and while the screen is
+locked**, and stops only when the user asks — from the app, or from the Android
+notification's Stop action.
+
+This also resolves what was a submission risk: `UIBackgroundModes: [audio]` is
+now backed by a feature that genuinely uses it. Apple rejects apps that declare
+a background mode they do not exercise.
+
+### Why raw PCM on disk
+
+Audio is streamed from the microphone as PCM and appended to a `.pcm` file,
+flushed on the interval from settings. A WAV header is prepended only when the
+recording is finalised, at which point it becomes `.wav`.
+
+The obvious alternative — let the plugin write a WAV directly, or write WAV
+segments and concatenate — is worse in two specific ways:
+
+1. **Concatenated WAVs embed 44-byte headers mid-stream.** Those bytes are not
+   audio. They produce clicks on playback and get fed to the VAD as noise.
+2. **A WAV whose header was never finalised is a repair job.** A raw PCM stream
+   is not: whatever bytes survived are valid audio, so recovery is "prepend a
+   header for the length on disk". `AudioRecordingService.recoverInterrupted()`
+   runs at startup and does exactly that for any `.pcm` left behind.
+
+The consequence is the crash-safety guarantee: **a crash, force quit or battery
+death loses at most one flush interval** (10 s by default).
+
+Byte counting also makes the storage cap exact — the final chunk is trimmed so
+the cap is honoured precisely rather than overshot by up to one buffer.
+
+### Android: the foreground service
+
+`android/app/src/main/kotlin/com/idatagear/momera/audio/RecordingService.kt`.
+
+Android will not let an app record from the background indefinitely. A
+foreground service is the sanctioned mechanism, and the platform **requires a
+persistent, non-dismissable notification** for the service's whole lifetime —
+that is how a user can always tell an app is recording. It is not optional and
+cannot be hidden.
+
+- Service type `microphone`, declared in both the manifest and the
+  `startForeground` call (mandatory from Android 14).
+- Permissions added: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`,
+  `POST_NOTIFICATIONS`.
+- The notification's text comes from Dart so it is localised with the rest of
+  the UI, and carries a **Stop** action. A Stop tap is forwarded to Dart via
+  `stopRequested`, because Dart owns the recorder and the file being written —
+  the service never touches the microphone itself.
+
+`POST_NOTIFICATIONS` is requested at runtime on first record (Android 13+).
+Recording proceeds either way: a denied grant only means the notification is
+not shown, so the user loses the indicator and the Stop action but keeps the
+recording.
+
+### iOS: let the plugin own the audio session
+
+`AppDelegate` deliberately does **not** configure `AVAudioSession`.
+
+`record_ios` manages the shared session itself — it sets `.playAndRecord` with
+the options from `RecordConfig.iosConfig` when capture starts. An `AppDelegate`
+that also set a category would simply be overwritten, and two owners of one
+audio session is how intermittent, unreproducible audio bugs happen. Session
+options are configured from Dart instead.
+
+What actually keeps capture alive when the screen locks is
+`UIBackgroundModes: audio` plus the plugin's active session. The method channel
+still exists on iOS so the Dart side is uniform, but its handlers are no-ops.
+
+### Surviving a phone call
+
+`AudioInterruptionMode.pauseResume`, not the plugin's default.
+
+The default is `pause`: capture stops on interruption and waits for a **manual**
+resume that this app never issues — so an incoming call would silently end a
+recording that the user believes is still running. That directly contradicts
+"record until the user taps stop". `pauseResume` resumes capture by itself.
+
+`allowHapticsAndSystemSoundsDuringRecording: true` additionally means a *ringing*
+call no longer interrupts at all — only actually answering one does.
+
+### Storage cap
+
+Stop-and-warn, never evict. When recordings reach the configured cap the
+recording is finalised (audio up to that point is kept) and the user is told.
+The app never deletes recordings to make room — silently destroying a user's
+audio is not a decision it gets to make.
+
+The budget is computed at start as `cap - bytes already used`, and
+`RecordingRepository.totalBytes()` counts the in-progress `.pcm` too, so the
+accounting stays honest during a recording.

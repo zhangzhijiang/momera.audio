@@ -71,6 +71,8 @@ class RecordingRepository {
       if (entry is! File) continue;
       total += await entry.length();
     }
+    // Note: this deliberately counts an in-progress `.pcm` too, so the storage
+    // cap accounts for audio being written right now.
     return total;
   }
 

@@ -139,4 +139,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoveredRecordingBody =>
       'A recording that was interrupted has been recovered.';
+
+  @override
+  String get stop => 'Stop';
+
+  @override
+  String get notificationRecording => 'Recording in progress';
 }

@@ -12,13 +12,13 @@ import '../providers/service_providers.dart';
 import 'model_download_sheet.dart';
 
 /// A single recording row: play/pause, metadata, transcript, and actions.
-/// Date + time in the active locale. A hardcoded `DateFormat` pattern would
-/// print English month names regardless of the chosen UI language.
-String _formatCreatedAt(BuildContext context, DateTime when) {
-  final tag = Localizations.localeOf(context).toLanguageTag();
-  return '${DateFormat.yMMMd(tag).format(when)} · '
-      '${DateFormat.jm(tag).format(when)}';
-}
+/// Fixed `yyyy-MM-dd HH:mm:ss`, 24-hour, in every language.
+///
+/// Deliberately *not* locale-aware. Recordings are identified by when they were
+/// made, so a single unambiguous, sortable format that reads the same in every
+/// language beats localised month names and AM/PM.
+String formatCreatedAt(DateTime when) =>
+    DateFormat('yyyy-MM-dd HH:mm:ss').format(when);
 
 class RecordingTile extends ConsumerStatefulWidget {
   const RecordingTile({super.key, required this.recording});
@@ -157,7 +157,7 @@ class _RecordingTileState extends ConsumerState<RecordingTile> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _formatCreatedAt(context, r.createdAt),
+                      formatCreatedAt(r.createdAt),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,

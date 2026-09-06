@@ -7,6 +7,16 @@
     <!-- Downloading the offline speech-to-text model at runtime -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Recording continues while the app is backgrounded or the screen is
+         locked. Android only permits that from a foreground service, which
+         must show a persistent notification for its whole lifetime. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <!-- Android 13+ gates the service notification behind a runtime grant.
+         Recording still works if it is denied; the notification is just not
+         shown. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="Momera.Audio"
         android:name="${applicationName}"
@@ -32,6 +42,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".RecordingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone"/>
 
         <meta-data
             android:name="flutterEmbedding"

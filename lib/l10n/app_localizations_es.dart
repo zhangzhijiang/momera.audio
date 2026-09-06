@@ -140,4 +140,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get recoveredRecordingBody =>
       'Se ha recuperado una grabación que se interrumpió.';
+
+  @override
+  String get stop => 'Detener';
+
+  @override
+  String get notificationRecording => 'Grabación en curso';
 }

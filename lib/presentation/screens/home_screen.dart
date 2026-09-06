@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/audio_recording_service.dart';
+import '../../core/services/recording_session_channel.dart';
 import '../../core/utils/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
+import '../providers/settings_provider.dart';
 import '../widgets/record_button.dart';
 import '../widgets/recording_tile.dart';
 import 'settings_screen.dart';
@@ -24,8 +27,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Timer? _timer;
 
   @override
+  void initState() {
+    super.initState();
+    // Stop tapped in the Android foreground-service notification. Dart owns the
+    // recorder and the file being written, so the platform side only forwards
+    // the intent and the teardown happens here.
+    RecordingSessionChannel.setStopRequestedHandler(() {
+      if (_isRecording) _toggleRecording();
+    });
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
+    RecordingSessionChannel.setStopRequestedHandler(null);
     super.dispose();
   }
 
@@ -34,22 +49,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (_isRecording) {
       await recorder.stopRecording();
-      _timer?.cancel();
-      setState(() {
-        _isRecording = false;
-        _elapsed = Duration.zero;
-      });
+      _onRecordingEnded();
       await ref.read(recordingsProvider.notifier).refresh();
       return;
     }
 
-    final path = await recorder.startRecording();
+    final l10n = AppLocalizations.of(context)!;
+    final settings = ref.read(settingsProvider);
+
+    // Budget for this recording: the cap from settings minus what recordings
+    // already occupy. Recording stops when this runs out rather than evicting
+    // anything — deleting a user's audio to make room for more is not a
+    // decision the app gets to make silently.
+    final used = await ref.read(recordingRepositoryProvider).totalBytes();
+    final available = settings.maxStorageBytes - used;
+    if (available <= 0) {
+      if (!mounted) return;
+      _showStorageFull(l10n, settings.maxStorageBytes);
+      return;
+    }
+
+    final path = await recorder.startRecording(
+      availableBytes: available,
+      flushInterval: settings.autosaveInterval,
+      notification: RecordingNotificationText(
+        title: l10n.appTitle,
+        body: l10n.notificationRecording,
+        stopLabel: l10n.stop,
+      ),
+      onStopped: _onStoppedByItself,
+    );
+
     if (path == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.micPermissionRequired),
-        ),
+        SnackBar(content: Text(l10n.micPermissionRequired)),
       );
       return;
     }
@@ -59,8 +93,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() => _elapsed += const Duration(seconds: 1));
+      setState(() => _elapsed = recorder.elapsed);
     });
+  }
+
+  /// The recording ended without the user tapping stop — the storage cap was
+  /// reached, or the audio stream was interrupted. Audio up to that point is
+  /// kept either way.
+  void _onStoppedByItself(RecordingResult result) {
+    if (!mounted) return;
+    _onRecordingEnded();
+    ref.read(recordingsProvider.notifier).refresh();
+    final l10n = AppLocalizations.of(context)!;
+    if (result.reason == RecordingStopReason.storageFull) {
+      _showStorageFull(l10n, ref.read(settingsProvider).maxStorageBytes);
+    }
+  }
+
+  void _onRecordingEnded() {
+    _timer?.cancel();
+    _timer = null;
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      _elapsed = Duration.zero;
+    });
+  }
+
+  void _showStorageFull(AppLocalizations l10n, int limitBytes) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.storageFullBody(formatBytes(limitBytes))),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   String _formatElapsed(Duration d) {

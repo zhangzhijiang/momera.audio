@@ -322,6 +322,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A recording that was interrupted has been recovered.'**
   String get recoveredRecordingBody;
+
+  /// No description provided for @stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stop;
+
+  /// Android foreground-service notification body while recording
+  ///
+  /// In en, this message translates to:
+  /// **'Recording in progress'**
+  String get notificationRecording;
 }
 
 class _AppLocalizationsDelegate

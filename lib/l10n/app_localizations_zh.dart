@@ -134,6 +134,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get recoveredRecordingBody => '已恢复一段中断的录音。';
+
+  @override
+  String get stop => '停止';
+
+  @override
+  String get notificationRecording => '正在录音';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -266,4 +272,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get recoveredRecordingBody => '已復原一段中斷的錄音。';
+
+  @override
+  String get stop => '停止';
+
+  @override
+  String get notificationRecording => '正在錄音';
 }

@@ -5,6 +5,9 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   /// Matches ModelDownloadService._backupChannel on the Dart side.
   private static let backupChannelName = "com.idatagear.momera.audio/backup"
+  /// Matches RecordingSessionChannel on the Dart side.
+  private static let recordingSessionChannelName =
+    "com.idatagear.momera.audio/recording_session"
 
   override func application(
     _ application: UIApplication,
@@ -16,6 +19,7 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registerBackupChannel(with: engineBridge.pluginRegistry)
+    registerRecordingSessionChannel(with: engineBridge.pluginRegistry)
   }
 
   /// Exposes NSURLIsExcludedFromBackupKey to Dart.
@@ -51,6 +55,39 @@ import UIKit
         result(FlutterError(code: "exclude_failed",
                             message: error.localizedDescription,
                             details: path))
+      }
+    }
+  }
+
+  /// Background / lock-screen capture on iOS.
+  ///
+  /// Deliberately does **not** configure `AVAudioSession`. `record_ios` manages
+  /// the shared session itself — it sets `.playAndRecord` with the options from
+  /// `RecordConfig.iosConfig` when capture starts — so a category set here would
+  /// simply be overwritten, and two owners of one audio session is how you get
+  /// intermittent, unreproducible audio bugs. Session options are configured
+  /// from Dart instead (see AudioRecordingService).
+  ///
+  /// What actually keeps capture alive when the screen locks is
+  /// `UIBackgroundModes: audio` in Info.plist plus the plugin's active session.
+  ///
+  /// The channel exists so the Dart side is uniform across platforms. On iOS
+  /// there is no notification to show — the system displays its own recording
+  /// indicator — so every method is a no-op.
+  private func registerRecordingSessionChannel(with registry: FlutterPluginRegistry) {
+    guard let registrar = registry.registrar(forPlugin: "MomeraRecordingSession") else {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: AppDelegate.recordingSessionChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "start", "update", "stop":
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
       }
     }
   }

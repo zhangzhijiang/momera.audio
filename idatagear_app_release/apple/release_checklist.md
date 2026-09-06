@@ -208,21 +208,33 @@ Last run 2026-09-05: analyze clean, **14/14 tests pass**,
 
 ---
 
-## 7. Not yet done — the settings that do nothing
+## 7. Background recording — implemented, needs device testing
 
-**`Maximum storage` and `Auto-save interval` are shown in the settings UI but
-are not enforced anywhere.** Nothing in the recording pipeline reads them. They
-become live with the background-recording work below. Shipping them inert means
-shipping controls that silently do nothing — finish the feature, or hide these
-two rows before submitting.
+Recording now continues while backgrounded and while the screen is locked, and
+stops only when the user asks. `UIBackgroundModes: [audio]` is therefore backed
+by a feature that genuinely uses it, which removes the earlier "declares a
+background mode it does not use" rejection risk.
 
----
+The storage cap and auto-save interval from settings are now enforced.
 
-## 8. Not yet done — background recording
+**None of this has been exercised on physical hardware.** The simulator cannot
+tell you anything useful about lock-screen audio, foreground services or
+interruptions. Test on real devices:
 
-`UIBackgroundModes: [audio]` **is already declared in `Info.plist`, but the
-feature is not implemented.** Apple rejects apps that declare a background mode
-they do not use, so this is a live submission risk.
-
-Either finish the feature or remove the key before submitting. Tracked
-separately from the port.
+- [ ] **iOS: lock the screen mid-recording**, wait a few minutes, unlock —
+      recording is still running and the audio is continuous.
+- [ ] **iOS: background the app** (home gesture), return — still recording.
+- [ ] **iOS: incoming phone call** while recording. Ringing must not interrupt;
+      answering pauses and hanging up resumes
+      (`AudioInterruptionMode.pauseResume`).
+- [ ] **Android: lock the screen mid-recording** — the notification is visible
+      on the lock screen with a live elapsed time.
+- [ ] **Android: Stop from the notification** ends the recording and the file
+      is playable.
+- [ ] **Android 13+: deny the notification permission**, then record — the
+      recording still works (just with no notification).
+- [ ] **Crash recovery**: force-quit mid-recording, relaunch. A recording
+      appears containing everything up to the last flush (≤10 s lost).
+- [ ] **Storage cap**: set the cap to 512 MB, record until it is hit. Recording
+      stops, the audio is kept and playable, and the message names the limit.
+- [ ] **Battery**: record for 30+ minutes locked and check the drain is sane.

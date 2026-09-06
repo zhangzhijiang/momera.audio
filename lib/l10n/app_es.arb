@@ -1,14 +1,11 @@
 {
   "@@locale": "es",
-
   "appTitle": "Momera.Audio",
-
   "tapToRecord": "Toca para grabar",
   "noRecordingsTitle": "Aún no hay grabaciones",
   "noRecordingsBody": "Toca el botón de grabar para capturar audio.",
   "micPermissionRequired": "Se necesita permiso del micrófono para grabar.",
   "loadFailed": "Error al cargar: {error}",
-
   "transcribe": "Transcribir",
   "transcribing": "Transcribiendo…",
   "deleteRecordingTitle": "¿Eliminar la grabación?",
@@ -16,12 +13,10 @@
   "delete": "Eliminar",
   "cancel": "Cancelar",
   "retry": "Reintentar",
-
   "downloadModelTitle": "Descargar el modelo de voz",
   "downloadModelBody": "La transcripción funciona sin conexión. El modelo de voz ({size}) se descarga una sola vez y se guarda en este dispositivo.",
   "download": "Descargar",
   "downloadFailed": "Error en la descarga. Comprueba tu conexión e inténtalo de nuevo.",
-
   "settings": "Ajustes",
   "settingsLanguage": "Idioma",
   "settingsLanguageSubtitle": "Idioma utilizado en toda la aplicación",
@@ -30,20 +25,18 @@
   "languageSpanish": "Español",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
-
   "settingsStorage": "Almacenamiento",
   "settingsMaxStorage": "Almacenamiento máximo",
   "settingsMaxStorageSubtitle": "La grabación se detiene cuando tus grabaciones alcanzan este tamaño.",
   "settingsStorageUsed": "{used} de {total} en uso",
-
   "settingsRecording": "Grabación",
   "settingsAutosaveInterval": "Intervalo de guardado automático",
   "settingsAutosaveIntervalSubtitle": "Con qué frecuencia se guarda en el disco la grabación en curso. Un fallo perderá como máximo esta cantidad de audio.",
   "seconds": "{count, plural, =1{1 segundo} other{{count} segundos}}",
-
   "storageFullTitle": "Límite de almacenamiento alcanzado",
   "storageFullBody": "La grabación se detuvo porque tus grabaciones alcanzaron el límite de {limit}. Elimina algunas grabaciones o aumenta el límite en Ajustes.",
-
   "recoveredRecordingTitle": "Grabación recuperada",
-  "recoveredRecordingBody": "Se ha recuperado una grabación que se interrumpió."
+  "recoveredRecordingBody": "Se ha recuperado una grabación que se interrumpió.",
+  "stop": "Detener",
+  "notificationRecording": "Grabación en curso"
 }

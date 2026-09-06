@@ -7,6 +7,11 @@ import 'service_providers.dart';
 class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
   @override
   Future<List<Recording>> build() async {
+    // Any `.pcm` left in the recordings directory is a recording that was
+    // interrupted by a crash, a force quit or the battery dying. Finalise those
+    // into playable `.wav` files before listing, so the audio that was already
+    // flushed to disk is never lost.
+    await ref.read(audioRecordingServiceProvider).recoverInterrupted();
     return ref.read(recordingRepositoryProvider).list();
   }
 

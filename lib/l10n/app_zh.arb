@@ -1,14 +1,11 @@
 {
   "@@locale": "zh",
-
   "appTitle": "Momera.Audio",
-
   "tapToRecord": "点击录音",
   "noRecordingsTitle": "还没有录音",
   "noRecordingsBody": "点击录音按钮开始录制。",
   "micPermissionRequired": "录音需要麦克风权限。",
   "loadFailed": "加载失败：{error}",
-
   "transcribe": "转写文字",
   "transcribing": "正在转写…",
   "deleteRecordingTitle": "删除这段录音？",
@@ -16,12 +13,10 @@
   "delete": "删除",
   "cancel": "取消",
   "retry": "重试",
-
   "downloadModelTitle": "下载语音模型",
   "downloadModelBody": "转写完全离线运行。语音模型（{size}）只需下载一次，之后保存在本机。",
   "download": "下载",
   "downloadFailed": "下载失败。请检查网络连接后重试。",
-
   "settings": "设置",
   "settingsLanguage": "语言",
   "settingsLanguageSubtitle": "应用界面使用的语言",
@@ -30,20 +25,18 @@
   "languageSpanish": "Español",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
-
   "settingsStorage": "存储空间",
   "settingsMaxStorage": "最大存储空间",
   "settingsMaxStorageSubtitle": "当录音总大小达到此上限时，录音会自动停止。",
   "settingsStorageUsed": "已使用 {used}／共 {total}",
-
   "settingsRecording": "录音",
   "settingsAutosaveInterval": "自动保存间隔",
   "settingsAutosaveIntervalSubtitle": "正在录制的音频写入磁盘的频率。即使应用崩溃，最多也只会丢失这段时长的录音。",
   "seconds": "{count, plural, other{{count} 秒}}",
-
   "storageFullTitle": "已达到存储上限",
   "storageFullBody": "录音已停止，因为录音总大小达到了 {limit} 的上限。请删除部分录音，或在设置中调高上限。",
-
   "recoveredRecordingTitle": "已恢复录音",
-  "recoveredRecordingBody": "已恢复一段中断的录音。"
+  "recoveredRecordingBody": "已恢复一段中断的录音。",
+  "stop": "停止",
+  "notificationRecording": "正在录音"
 }

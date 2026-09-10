@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
@@ -23,6 +25,12 @@ import 'transcription_service.dart';
 /// that [TranscriptionService.transcribeFile] resets and drives. The
 /// recogniser, at ~228 MB, is shared — guarded by
 /// [TranscriptionService.tryAcquire].
+///
+/// **Nothing here blocks the caller.** Decoding happens on the worker isolate
+/// behind [TranscriptionService.decodeSegment], which matters because [feed]
+/// runs inside the recorder's audio-chunk handler: a decode on this isolate
+/// would stall the UI *and* delay the next chunk being written to disk. Only
+/// the VAD runs inline, and it costs well under a millisecond per 32 ms window.
 class LiveTranscriptionService {
   LiveTranscriptionService(this._transcription);
 
@@ -35,9 +43,10 @@ class LiveTranscriptionService {
   /// Longest stretch the VAD will hold before force-emitting a segment.
   ///
   /// Lower than the 15 s used for file transcription: this is the worst-case
-  /// wait before the speaker sees *anything*, and it also bounds how long a
-  /// single blocking decode can be. File transcription has no such deadline and
-  /// benefits from longer segments.
+  /// wait before the speaker sees *anything*, and it also bounds how long one
+  /// decode occupies the worker, and therefore how far behind the following
+  /// phrases can fall. File transcription has no such deadline and benefits
+  /// from longer segments.
   static const double _maxSpeechSeconds = 7.0;
 
   sherpa_onnx.VoiceActivityDetector? _vad;
@@ -65,10 +74,16 @@ class LiveTranscriptionService {
   /// [fromByteOffset] is how many bytes of the recording have already been
   /// written, so segment timings are relative to the recording rather than to
   /// when the user started holding the button.
-  Future<bool> start({required int fromByteOffset}) async {
+  Future<bool> start({
+    required int fromByteOffset,
+    TranscriptionLanguage language = TranscriptionLanguage.auto,
+  }) async {
     if (_running) return true;
 
-    final paths = await _transcription.modelPathsIfReady();
+    // Passing the user's language matters: warming the recogniser with `auto`
+    // and then running a file transcription with a pinned language would tear
+    // the whole 228 MB model down and rebuild it.
+    final paths = await _transcription.modelPathsIfReady(language: language);
     if (paths == null) return false;
     if (!_transcription.tryAcquire()) return false;
 
@@ -78,7 +93,7 @@ class LiveTranscriptionService {
           sileroVad: sherpa_onnx.SileroVadModelConfig(
             model: paths.vadModelPath,
             threshold: 0.5,
-            minSilenceDuration: 0.25,
+            minSilenceDuration: 0.5,
             minSpeechDuration: 0.25,
             windowSize: _vadWindowSamples,
             maxSpeechDuration: _maxSpeechSeconds,
@@ -103,19 +118,28 @@ class LiveTranscriptionService {
 
   /// Feed one chunk of recorded PCM16.
   ///
-  /// Returns the segments that completed on this chunk — usually none, and one
-  /// when the speaker finishes a phrase.
+  /// Resolves with the segments that completed on this chunk — usually none,
+  /// and one when the speaker finishes a phrase.
   ///
-  /// **Blocking while decoding.** Each completed utterance is decoded inline
-  /// with a native call that cannot yield. Segments are capped at
-  /// [_maxSpeechSeconds] to bound that.
-  List<TranscriptSegment> feed(Uint8List pcm) {
+  /// **Overlapping calls are safe.** The VAD half runs synchronously, before
+  /// the first `await`, so `_carry` and the detector can never be mutated by
+  /// two calls at once. Only decoding is awaited, and that happens on the
+  /// worker isolate rather than blocking the caller.
+  Future<List<TranscriptSegment>> feed(Uint8List pcm) {
+    final pending = _collectSpeech(pcm);
+    if (pending.isEmpty) return Future.value(const []);
+    return _decodeAll(pending);
+  }
+
+  /// The synchronous half of [feed]: everything that touches [_carry] or the
+  /// detector, returning the utterances the VAD closed out.
+  List<_PendingSpeech> _collectSpeech(Uint8List pcm) {
     if (!_running || _vad == null || pcm.isEmpty) return const [];
 
     _appendToCarry(pcm);
 
-    final segments = <TranscriptSegment>[];
     final vad = _vad!;
+    final pending = <_PendingSpeech>[];
 
     var consumed = 0;
     while (_carry.length - consumed >= _vadWindowSamples) {
@@ -127,14 +151,13 @@ class LiveTranscriptionService {
 
       while (!vad.isEmpty()) {
         final segment = vad.front();
-        final decoded = _transcription.decodeSegment(
+        pending.add(_PendingSpeech(
           segment.samples,
           // The VAD's own `start` counts from where this pass began feeding,
           // so shift it to the recording's timeline.
-          startSamples: _carryStartSample + segment.start,
-        );
+          _carryStartSample + segment.start,
+        ));
         vad.pop();
-        if (decoded != null) segments.add(decoded);
       }
     }
 
@@ -142,27 +165,55 @@ class LiveTranscriptionService {
       _carry.removeRange(0, consumed);
       _carryStartSample += consumed;
     }
+    return pending;
+  }
+
+  /// Decode queued utterances in order.
+  ///
+  /// The worker answers requests first-in-first-out, so awaiting them in
+  /// sequence keeps phrases in the order they were spoken even when several
+  /// [feed] calls are in flight. A failed decode drops that phrase rather than
+  /// aborting the pass — losing a line of preview text must never interrupt a
+  /// recording.
+  Future<List<TranscriptSegment>> _decodeAll(
+    List<_PendingSpeech> pending,
+  ) async {
+    final segments = <TranscriptSegment>[];
+    for (final speech in pending) {
+      try {
+        final decoded = await _transcription.decodeSegment(
+          speech.samples,
+          startSamples: speech.startSamples,
+        );
+        if (decoded != null) segments.add(decoded);
+      } catch (e) {
+        debugPrint('LiveTranscriptionService: dropped a phrase: $e');
+      }
+    }
     return segments;
   }
 
   /// Stop the pass and return any trailing speech the VAD had not yet emitted.
-  List<TranscriptSegment> stop() {
+  ///
+  /// The recogniser is released only once those trailing decodes have finished,
+  /// so a file transcription started immediately afterwards cannot begin while
+  /// this pass still has work outstanding.
+  Future<List<TranscriptSegment>> stop() async {
     if (!_running) return const [];
     _running = false;
 
-    final segments = <TranscriptSegment>[];
+    final pending = <_PendingSpeech>[];
     final vad = _vad;
     if (vad != null) {
       try {
         vad.flush();
         while (!vad.isEmpty()) {
           final segment = vad.front();
-          final decoded = _transcription.decodeSegment(
+          pending.add(_PendingSpeech(
             segment.samples,
-            startSamples: _carryStartSample + segment.start,
-          );
+            _carryStartSample + segment.start,
+          ));
           vad.pop();
-          if (decoded != null) segments.add(decoded);
         }
       } catch (e) {
         debugPrint('LiveTranscriptionService: flush failed: $e');
@@ -172,8 +223,12 @@ class LiveTranscriptionService {
     _vad = null;
     _carry.clear();
     _pendingByte = null;
-    _transcription.release();
-    return segments;
+
+    try {
+      return await _decodeAll(pending);
+    } finally {
+      _transcription.release();
+    }
   }
 
   void _appendToCarry(Uint8List pcm) {
@@ -208,6 +263,17 @@ class LiveTranscriptionService {
   int? _pendingByte;
 
   void dispose() {
-    if (_running) stop();
+    if (_running) unawaited(stop());
   }
+}
+
+/// One utterance the VAD has closed out, waiting to be decoded.
+@immutable
+class _PendingSpeech {
+  const _PendingSpeech(this.samples, this.startSamples);
+
+  final Float32List samples;
+
+  /// Offset of this speech from the start of the recording, in samples.
+  final int startSamples;
 }

@@ -125,4 +125,180 @@ void main() {
       expect(await AudioRecordingService.finalisePcm(missing), isNull);
     });
   });
+
+  _locateTests();
+
+  _sizeLimitTests();
 }
+
+/// A WAV file whose chunk list is [chunks] — each an id plus its body — so a
+/// test can build layouts the recorder never writes but other tools do.
+Uint8List _wavWithChunks(List<(String, Uint8List)> chunks) {
+  final body = BytesBuilder();
+  for (final (id, payload) in chunks) {
+    body.add(Uint8List.fromList(id.codeUnits));
+    final size = ByteData(4)..setUint32(0, payload.length, Endian.little);
+    body.add(size.buffer.asUint8List());
+    body.add(payload);
+    // Chunks are word-aligned.
+    if (payload.length.isOdd) body.addByte(0);
+  }
+  final bodyBytes = body.takeBytes();
+
+  final out = BytesBuilder();
+  out.add(Uint8List.fromList('RIFF'.codeUnits));
+  final riffSize = ByteData(4)
+    ..setUint32(0, 4 + bodyBytes.length, Endian.little);
+  out.add(riffSize.buffer.asUint8List());
+  out.add(Uint8List.fromList('WAVE'.codeUnits));
+  out.add(bodyBytes);
+  return out.takeBytes();
+}
+
+/// The 16-byte body of a PCM `fmt ` chunk.
+Uint8List _fmtBody() => buildWavHeader(dataBytes: 0).sublist(20, 36);
+
+
+// Registered from main().
+void _locateTests() {
+  group('locatePcmRegion', () {
+    late Directory dir;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('wav_locate_test');
+    });
+    tearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    /// Writes [bytes] to a file and locates its PCM payload.
+    Future<PcmRegion> locate(Uint8List bytes) async {
+      final file = File('${dir.path}/probe.wav');
+      await file.writeAsBytes(bytes);
+      final raf = await file.open();
+      try {
+        return await locatePcmRegion(raf, await file.length());
+      } finally {
+        await raf.close();
+      }
+    }
+
+    test('finds the payload behind a canonical 44-byte header', () async {
+      const dataBytes = 3200;
+      final bytes = Uint8List.fromList([
+        ...buildWavHeader(dataBytes: dataBytes),
+        ...List<int>.filled(dataBytes, 7),
+      ]);
+
+      final region = await locate(bytes);
+      expect(region.offset, wavHeaderBytes);
+      expect(region.length, dataBytes);
+      expect(region.isEmpty, isFalse);
+    });
+
+    test('skips chunks that sit before the data chunk', () async {
+      // Recorders and editors routinely insert LIST/INFO metadata; walking the
+      // chunk list is the only way to find the audio behind it.
+      final payload = Uint8List.fromList(List<int>.filled(64, 3));
+      final bytes = _wavWithChunks([
+        ('fmt ', _fmtBody()),
+        ('LIST', Uint8List.fromList('INFOmetadata!'.codeUnits)),
+        ('data', payload),
+      ]);
+
+      final region = await locate(bytes);
+      expect(region.length, payload.length);
+      // The payload must be exactly where the region says it is.
+      expect(bytes.sublist(region.offset, region.offset + region.length),
+          equals(payload));
+    });
+
+    test('word-aligns past an odd-length chunk', () async {
+      final payload = Uint8List.fromList(List<int>.filled(32, 9));
+      final bytes = _wavWithChunks([
+        ('fmt ', _fmtBody()),
+        // 13 bytes: the reader must skip the pad byte too, or it reads the
+        // chunk id one byte off and never finds the audio.
+        ('LIST', Uint8List.fromList('INFOodd-sized'.codeUnits)),
+        ('data', payload),
+      ]);
+
+      final region = await locate(bytes);
+      expect(bytes.sublist(region.offset, region.offset + region.length),
+          equals(payload));
+    });
+
+    test('clamps a data chunk that claims more than the file holds', () async {
+      // What an interrupted write looks like: the header promises audio the
+      // file does not contain. Reading to the claimed length would overrun.
+      const claimed = 32000;
+      final bytes = Uint8List.fromList([
+        ...buildWavHeader(dataBytes: claimed),
+        ...List<int>.filled(500, 1),
+      ]);
+
+      final region = await locate(bytes);
+      expect(region.offset, wavHeaderBytes);
+      expect(region.length, 500);
+    });
+
+    test('falls back to the canonical header when there is no data chunk',
+        () async {
+      final bytes = _wavWithChunks([
+        ('fmt ', _fmtBody()),
+        ('LIST', Uint8List.fromList(List<int>.filled(64, 0))),
+      ]);
+
+      final region = await locate(bytes);
+      expect(region.offset, wavHeaderBytes);
+      expect(region.length, bytes.length - wavHeaderBytes);
+    });
+
+    test('reports empty for a file too short to be a WAV', () async {
+      final region = await locate(Uint8List.fromList(List<int>.filled(20, 0)));
+      expect(region.isEmpty, isTrue);
+    });
+
+    test('reports empty for a header with no payload', () async {
+      final region = await locate(buildWavHeader(dataBytes: 0));
+      expect(region.isEmpty, isTrue);
+    });
+  });
+}
+
+// Registered from main().
+void _sizeLimitTests() {
+  group('maxWavDataBytes', () {
+    test('is the largest payload a 32-bit RIFF size can describe', () {
+      // The RIFF chunk size field holds `36 + dataBytes`, so that sum — not the
+      // payload alone — is what must fit in a uint32.
+      expect(36 + maxWavDataBytes, lessThanOrEqualTo(0xFFFFFFFF));
+      expect(36 + maxWavDataBytes + 2, greaterThan(0xFFFFFFFF));
+      // Floored to a whole PCM16 mono frame, so the cut never splits a sample.
+      expect(maxWavDataBytes.isEven, isTrue);
+    });
+
+    test('is about 37 hours of our recording format', () {
+      final limit = durationForPcmBytes(maxWavDataBytes);
+      expect(limit.inHours, 37);
+    });
+
+    test('a header at exactly the limit round-trips without wrapping', () {
+      final header = buildWavHeader(dataBytes: maxWavDataBytes);
+      expect(_u32(header, 40), maxWavDataBytes);
+      expect(_u32(header, 4), 36 + maxWavDataBytes);
+    });
+
+    test('a payload past the limit is refused rather than silently truncated',
+        () {
+      // setUint32 wraps without complaint, which would write a header that
+      // misdescribes the file with nothing to signal it.
+      expect(
+        () => buildWavHeader(dataBytes: maxWavDataBytes + 2),
+        throwsArgumentError,
+      );
+      expect(() => buildWavHeader(dataBytes: -1), throwsArgumentError);
+    });
+  });
+}
+

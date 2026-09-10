@@ -1,8 +1,6 @@
 import 'package:path/path.dart' as p;
 
 import '../../core/services/transcription_service.dart';
-import '../../core/translation/translation_service.dart';
-import '../../core/translation/translator.dart';
 
 /// A single saved audio recording on disk, plus its optional transcript.
 ///
@@ -38,10 +36,6 @@ class Recording {
   /// just without a seek position.
   final List<TranscriptSegment> segments;
 
-  /// Translations of [transcript], keyed by target language. A recording can
-  /// hold several, so switching target language does not discard earlier work.
-  final Map<TranslationLanguage, TranslationOutcome> translations;
-
   const Recording({
     required this.path,
     required this.createdAt,
@@ -50,7 +44,6 @@ class Recording {
     this.transcript,
     this.languages = const [],
     this.segments = const [],
-    this.translations = const {},
   });
 
   /// File name including extension, e.g. `recording_20260620_143000.wav`.
@@ -78,23 +71,28 @@ class Recording {
   /// True when speakers used more than one language in this recording.
   bool get isMultilingual => languages.length > 1;
 
+  /// [clearTranscript] drops the transcript and everything derived from it.
+  ///
+  /// A plain `copyWith(transcript: null)` cannot express this — every field
+  /// here falls back with `??`, so null means "leave alone". The three fields
+  /// clear together because that is what removal does on disk: they live in one
+  /// sidecar.
   Recording copyWith({
     String? path,
     Duration? duration,
     String? transcript,
     List<TranscriptionLanguage>? languages,
     List<TranscriptSegment>? segments,
-    Map<TranslationLanguage, TranslationOutcome>? translations,
+    bool clearTranscript = false,
   }) {
     return Recording(
       path: path ?? this.path,
       createdAt: createdAt,
       sizeBytes: sizeBytes,
       duration: duration ?? this.duration,
-      transcript: transcript ?? this.transcript,
-      languages: languages ?? this.languages,
-      segments: segments ?? this.segments,
-      translations: translations ?? this.translations,
+      transcript: clearTranscript ? null : (transcript ?? this.transcript),
+      languages: clearTranscript ? const [] : (languages ?? this.languages),
+      segments: clearTranscript ? const [] : (segments ?? this.segments),
     );
   }
 }

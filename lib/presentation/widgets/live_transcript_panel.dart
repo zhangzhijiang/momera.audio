@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/translation/translator.dart';
 import '../../core/utils/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/live_transcript_provider.dart';
@@ -20,30 +19,42 @@ class LiveTranscriptPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = AppTheme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final state = ref.watch(liveTranscriptProvider);
 
     return Container(
       constraints: const BoxConstraints(maxHeight: _maxHeight),
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(top: BorderSide(color: AppTheme.borderLight)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.borderLight)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(state: state, l10n: l10n),
+          _Header(
+            state: state,
+            l10n: l10n,
+            // Closing also explains how to get it back: the hold button
+            // carries no label of its own, and this header was the affordance.
+            onClose: () {
+              ref.read(liveTranscriptProvider.notifier).dismissPanel();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n.livePanelHidden)),
+              );
+            },
+          ),
           Flexible(
             child: state.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
                     child: Text(
                       state.active ? l10n.liveListening : l10n.liveEmpty,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textHint,
+                        color: colors.textHint,
                       ),
                     ),
                   )
@@ -62,13 +73,19 @@ class LiveTranscriptPanel extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.state, required this.l10n});
+  const _Header({
+    required this.state,
+    required this.l10n,
+    required this.onClose,
+  });
 
   final LiveTranscriptState state;
   final AppLocalizations l10n;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     final String label;
     if (state.starting) {
       label = l10n.liveStarting;
@@ -85,7 +102,7 @@ class _Header extends StatelessWidget {
           Icon(
             state.active ? Icons.graphic_eq_rounded : Icons.subtitles_outlined,
             size: 14,
-            color: state.active ? AppTheme.accent : AppTheme.textHint,
+            color: state.active ? colors.accent : colors.textHint,
           ),
           const SizedBox(width: 6),
           Text(
@@ -94,15 +111,24 @@ class _Header extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
-              color: state.active ? AppTheme.accent : AppTheme.textHint,
+              color: state.active ? colors.accent : colors.textHint,
             ),
           ),
           const Spacer(),
-          if (state.translateTo != null)
-            Text(
-              translationLanguageLabel(l10n, state.translateTo!),
-              style: const TextStyle(fontSize: 11, color: AppTheme.textHint),
-            ),
+          // Without this the panel has no way out: releasing the hold button
+          // stops the pass but deliberately keeps the text on screen, so the
+          // last phrases stay readable — which left the panel there for the
+          // rest of the recording. Closing is the missing half of that.
+          IconButton(
+            icon: const Icon(Icons.close_rounded),
+            iconSize: 16,
+            color: colors.textHint,
+            tooltip: l10n.hideLiveText,
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            onPressed: onClose,
+          ),
         ],
       ),
     );
@@ -116,33 +142,16 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            line.segment.text,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.35,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          // The translated line sits under its source, so a bilingual
-          // conversation reads as pairs rather than as two separate columns.
-          if (line.translation != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              line.translation!,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: AppTheme.accent,
-              ),
-            ),
-          ],
-        ],
+      child: Text(
+        line.segment.text,
+        style: TextStyle(
+          fontSize: 14,
+          height: 1.35,
+          color: colors.textPrimary,
+        ),
       ),
     );
   }

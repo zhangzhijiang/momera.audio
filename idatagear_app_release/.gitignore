@@ -1,0 +1,9 @@
+# Screenshot candidate pools and contact sheets are large and regenerable.
+#
+# 50 candidates x 3 tiers x 5 locales is 750 PNGs for Play alone — several
+# hundred MB — and every one of them is reproducible with
+# `./idatagear_app_release/store-kit shoot`. What ships is `upload/`, the
+# generated graphics and the copy, and those ARE committed.
+*/screenshots/candidates/
+*/screenshots/sheets/
+*/previews/*/

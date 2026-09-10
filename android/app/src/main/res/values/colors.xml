@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FDFDFD</color>
+    <!-- The colour the OS paints before Flutter's first frame. Must stay in
+         sync with AppTheme.background in lib/core/utils/app_theme.dart and with
+         the LaunchScreen.storyboard background on iOS — a mismatch shows up as
+         a flash on every cold start. -->
+    <color name="launch_background">#F4F4F6</color>
+</resources>

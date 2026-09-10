@@ -11,6 +11,10 @@
          locked. Android only permits that from a foreground service, which
          must show a persistent notification for its whole lifetime. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <!-- Held only while recording. The audio stack keeps the CPU alive on its
+         own in the common case, but a device that dozes mid-recording loses
+         audio, and this is the sanctioned way to say "not yet". -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <!-- Android 13+ gates the service notification behind a runtime grant.
          Recording still works if it is denied; the notification is just not
@@ -43,10 +47,15 @@
             </intent-filter>
         </activity>
 
+        <!-- stopWithTask: capture belongs to the Flutter engine, which dies
+             with the activity. Keeping the service alive past that would show a
+             "Recording" notification for a recording that is no longer
+             happening. -->
         <service
             android:name=".RecordingService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="microphone"/>
 
         <meta-data

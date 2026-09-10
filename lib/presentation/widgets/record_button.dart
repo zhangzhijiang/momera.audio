@@ -15,37 +15,55 @@ class RecordButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 72,
-        height: 72,
+        width: 88,
+        height: 88,
         decoration: BoxDecoration(
-          color: isRecording ? AppTheme.surface : AppTheme.recordRed,
+          color: isRecording ? colors.surface : colors.recordRed,
           shape: BoxShape.circle,
           border: Border.all(
-            color: isRecording ? AppTheme.recordRed : Colors.transparent,
-            width: 4,
+            color: isRecording ? colors.recordRed : Colors.transparent,
+            width: 5,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.recordRed.withValues(alpha: 0.35),
+              color: colors.recordRed.withValues(alpha: 0.35),
               blurRadius: 16,
               spreadRadius: isRecording ? 2 : 0,
             ),
           ],
         ),
+        // A microphone at rest says what the button captures; a square while
+        // recording says what tapping it does now. Deliberately not a mic in
+        // both states — the stop affordance is the more useful thing to show
+        // once recording is already under way.
         child: Center(
-          child: AnimatedContainer(
+          child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
-            width: isRecording ? 26 : 30,
-            height: isRecording ? 26 : 30,
-            decoration: BoxDecoration(
-              color: isRecording ? AppTheme.recordRed : Colors.white,
-              borderRadius:
-                  BorderRadius.circular(isRecording ? 6 : 30),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(scale: animation, child: child),
             ),
+            child: isRecording
+                ? Container(
+                    key: const ValueKey('stop'),
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: colors.recordRed,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  )
+                : const Icon(
+                    Icons.mic_rounded,
+                    key: ValueKey('mic'),
+                    color: Colors.white,
+                    size: 40,
+                  ),
           ),
         ),
       ),

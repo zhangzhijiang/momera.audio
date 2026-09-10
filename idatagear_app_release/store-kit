@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Thin wrapper around google_play_store_helper.
+# Config for this app lives beside this script in ./store-kit.json
+#
+#   ./idatagear_app_release/store-kit preflight            checks to run BEFORE capturing
+#   ./idatagear_app_release/store-kit shoot [args]         capture every tier x locale
+#   ./idatagear_app_release/store-kit sheets               contact sheets for choosing
+#   ./idatagear_app_release/store-kit select [--init]      selection.json -> upload set
+#   ./idatagear_app_release/store-kit generate             icon + feature graphics
+#   ./idatagear_app_release/store-kit validate             check against Play's rules
+#   ./idatagear_app_release/store-kit capture <tier>       set device geometry by hand
+#   ./idatagear_app_release/store-kit capture reset        restore device
+#
+# App Preview VIDEOS (Apple only — Play takes a YouTube URL, not a file):
+# One iPhone covers every iPhone size; there is no device sweep.
+#   ./idatagear_app_release/store-kit record                 one phone, each locale
+#   ./idatagear_app_release/store-kit record --locale en     just one locale
+#   ./idatagear_app_release/store-kit record --dry-run       show the matrix
+#
+# App Store variants of the same steps (see the apple-store-assets command):
+#   ./idatagear_app_release/store-kit shoot --platform ios      iPhone / iPad
+#   ./idatagear_app_release/store-kit shoot --platform macos    Mac (this machine)
+#   ./idatagear_app_release/store-kit generate --store appstore
+#   ./idatagear_app_release/store-kit validate --store appstore
+#   ./idatagear_app_release/store-kit capture-ios <iphone|ipad|reset>
+set -euo pipefail
+KIT="${GOOGLE_PLAY_STORE_HELPER:-${STORE_KIT:-$HOME/Developer/projects/google_play_store_helper}}"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[[ -d "$KIT" ]] || { echo "google_play_store_helper not found at $KIT (set \$GOOGLE_PLAY_STORE_HELPER)"; exit 1; }
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  preflight|generate|validate|shoot|sheets|record) python3 "$KIT/bin/$cmd.py" "$APP_DIR" "$@" ;;
+  select)                                   python3 "$KIT/bin/select_upload.py" "$APP_DIR" "$@" ;;
+  capture)                                  "$KIT/bin/capture.sh" "${1:-}" "$APP_DIR" ;;
+  capture-ios)                              "$KIT/bin/capture_ios.sh" "${1:-}" "$APP_DIR" ;;
+  *) sed -n '2,27p' "${BASH_SOURCE[0]}"; exit 1 ;;
+esac

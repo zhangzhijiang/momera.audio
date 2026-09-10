@@ -1,6 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/services/transcription_service.dart';
 import '../models/app_settings.dart';
 
 /// Persists [AppSettings] in shared preferences.
@@ -12,8 +11,11 @@ class SettingsRepository {
   static const String _keyLanguage = 'settings.language';
   static const String _keyMaxStorageBytes = 'settings.maxStorageBytes';
   static const String _keyAutosaveSeconds = 'settings.autosaveSeconds';
-  static const String _keyTranscriptionLanguage =
-      'settings.transcriptionLanguage';
+  static const String _keySkipSilence = 'settings.skipSilence';
+  static const String _keyThemeMode = 'settings.themeMode';
+  // A 'settings.transcriptionLanguage' key written by an older build is simply
+  // never read again. Recognition is always automatic now, so there is nothing
+  // for a stored value to mean.
 
   Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -29,9 +31,9 @@ class SettingsRepository {
       autosaveInterval: (autosaveSeconds != null && autosaveSeconds > 0)
           ? Duration(seconds: autosaveSeconds)
           : AppSettings.defaultAutosaveInterval,
-      transcriptionLanguage: TranscriptionLanguage.fromName(
-        prefs.getString(_keyTranscriptionLanguage),
-      ),
+      skipSilence:
+          prefs.getBool(_keySkipSilence) ?? AppSettings.defaultSkipSilence,
+      themeMode: AppThemeMode.fromName(prefs.getString(_keyThemeMode)),
     );
   }
 
@@ -40,9 +42,7 @@ class SettingsRepository {
     await prefs.setString(_keyLanguage, settings.language.name);
     await prefs.setInt(_keyMaxStorageBytes, settings.maxStorageBytes);
     await prefs.setInt(_keyAutosaveSeconds, settings.autosaveInterval.inSeconds);
-    await prefs.setString(
-      _keyTranscriptionLanguage,
-      settings.transcriptionLanguage.name,
-    );
+    await prefs.setBool(_keySkipSilence, settings.skipSilence);
+    await prefs.setString(_keyThemeMode, settings.themeMode.name);
   }
 }

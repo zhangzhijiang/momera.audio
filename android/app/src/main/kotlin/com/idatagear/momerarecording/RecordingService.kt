@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 
 /**
@@ -46,6 +47,20 @@ class RecordingService : Service() {
         var onStopRequested: (() -> Unit)? = null
     }
 
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    /**
+     * Whether this instance has been promoted with `startForeground`.
+     *
+     * A per-second update intent can arrive at a *fresh* service instance —
+     * Android killed the old one and the intent brought the class back. Such an
+     * instance has been started but never promoted, so posting its notification
+     * would leave a "recording" notification with no foreground service behind
+     * it, and a service started via `startForegroundService` that never calls
+     * `startForeground` is killed by the platform within five seconds.
+     */
+    private var isForeground = false
+
     private var title: String = "Momera Recorder"
     private var body: String = "Recording in progress"
     private var stopLabel: String = "Stop"
@@ -58,14 +73,25 @@ class RecordingService : Service() {
             ACTION_STOP -> {
                 // The user tapped Stop in the notification. Tell Dart, which
                 // owns the recorder, and let it drive the teardown.
+                //
+                // Promote first if this instance was created by this very
+                // intent: stopping a service that was started and never
+                // promoted is what raises ForegroundServiceDidNotStartInTime.
+                if (!isForeground) startInForeground()
                 onStopRequested?.invoke()
                 stopRecording()
                 return START_NOT_STICKY
             }
             ACTION_UPDATE -> {
                 seconds = intent.getIntExtra(EXTRA_SECONDS, seconds)
-                notificationManager().notify(NOTIFICATION_ID, buildNotification())
-                return START_STICKY
+                if (isForeground) {
+                    notificationManager().notify(NOTIFICATION_ID, buildNotification())
+                } else {
+                    // Recreated by this update. Promote rather than post, or
+                    // the platform kills us for never calling startForeground.
+                    startInForeground()
+                }
+                return START_NOT_STICKY
             }
             else -> {
                 intent?.getStringExtra(EXTRA_TITLE)?.let { title = it }
@@ -73,12 +99,16 @@ class RecordingService : Service() {
                 intent?.getStringExtra(EXTRA_STOP_LABEL)?.let { stopLabel = it }
                 seconds = 0
                 startInForeground()
-                return START_STICKY
+                // Not sticky: if the process is killed the engine goes with it,
+                // so a restarted service would show a recording notification
+                // with no recording behind it.
+                return START_NOT_STICKY
             }
         }
     }
 
     private fun startInForeground() {
+        acquireWakeLock()
         createChannel()
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -92,11 +122,64 @@ class RecordingService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+        isForeground = true
     }
 
     private fun stopRecording() {
+        isForeground = false
+        releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    /**
+     * Keep the CPU running for the length of the recording.
+     *
+     * An active AudioRecord usually holds the device awake by itself, but
+     * "usually" is not the promise this app makes: the recording continues
+     * until the user stops it. The lock is partial — the screen stays off — and
+     * is released the moment recording ends, including if the service is killed
+     * out from under us.
+     */
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = power.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "MomeraRecorder::capture"
+        ).apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+    }
+
+    /**
+     * The user swiped the app away.
+     *
+     * Capture lives in the Flutter engine, which is destroyed with the activity,
+     * so the recording is over whatever this service does. Shutting down keeps
+     * the notification honest; the audio flushed so far is finalised on the next
+     * launch by `recoverInterrupted`.
+     *
+     * Belt and braces: `android:stopWithTask="true"` in the manifest already
+     * makes the platform stop this service on task removal, and that flag means
+     * this callback is not guaranteed to run. Whichever path a given ROM takes,
+     * the wake lock is released — here, or in [onDestroy].
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        stopRecording()
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onDestroy() {
+        isForeground = false
+        releaseWakeLock()
+        super.onDestroy()
     }
 
     private fun buildNotification(): Notification {

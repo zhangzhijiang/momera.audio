@@ -3,22 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/utils/app_theme.dart';
+import 'data/models/app_settings.dart';
 import 'l10n/app_localizations.dart';
 import 'presentation/providers/settings_provider.dart';
-import 'presentation/screens/home_screen.dart';
+import 'presentation/screens/splash_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: AppTheme.background,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
-
   runApp(const ProviderScope(child: MomeraRecordingApp()));
 }
 
@@ -29,11 +20,18 @@ class MomeraRecordingApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Null locale means "follow the device", which is the default.
     final locale = ref.watch(settingsProvider.select((s) => s.language.locale));
+    final themeMode = ref.watch(settingsProvider.select((s) => s.themeMode));
 
     return MaterialApp(
       title: 'Momera Recorder',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: switch (themeMode) {
+        AppThemeMode.system => ThemeMode.system,
+        AppThemeMode.light => ThemeMode.light,
+        AppThemeMode.dark => ThemeMode.dark,
+      },
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -41,7 +39,10 @@ class MomeraRecordingApp extends ConsumerWidget {
       // `zh`), or to a language we do not translate. Resolve those explicitly
       // rather than letting Flutter fall through to the first supported locale.
       localeResolutionCallback: resolveLocale,
-      home: const HomeScreen(),
+      // The status and navigation bars are painted by the system, so they have
+      // to be told which theme won — including when "system" resolves it, which
+      // only the built subtree knows.
+      home: const _SystemChrome(child: SplashGate()),
     );
   }
 
@@ -77,5 +78,33 @@ class MomeraRecordingApp extends ConsumerWidget {
     }
 
     return const Locale('en');
+  }
+}
+
+/// Keeps the system bars in step with the active theme.
+///
+/// Sits inside `MaterialApp` rather than being set once in `main`, because with
+/// `ThemeMode.system` the answer changes when the device does, and only a
+/// widget below the theme can see it.
+class _SystemChrome extends StatelessWidget {
+  const _SystemChrome({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: colors.background,
+        systemNavigationBarIconBrightness:
+            dark ? Brightness.light : Brightness.dark,
+      ),
+      child: child,
+    );
   }
 }

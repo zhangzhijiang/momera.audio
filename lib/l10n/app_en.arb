@@ -36,13 +36,13 @@
   "settings": "Settings",
   "settingsLanguage": "Language",
   "settingsLanguageSubtitle": "Language used throughout the app",
+  "settingsInfo": "About this setting",
   "languageSystem": "System default",
   "languageEnglish": "English",
   "languageChineseSimplified": "简体中文",
   "languageChineseTraditional": "繁體中文",
-  "settingsStorage": "Storage",
   "settingsMaxStorage": "Maximum storage",
-  "settingsMaxStorageSubtitle": "Recording stops when your recordings reach this size.",
+  "settingsMaxStorageSubtitle": "Recording stops when your recordings reach this size. The times shown are lengths of audio — with Skip silence on, a session can run for longer than that.",
   "settingsStorageUsed": "{used} of {total} used",
   "@settingsStorageUsed": {
     "placeholders": {
@@ -54,7 +54,6 @@
       }
     }
   },
-  "settingsRecording": "Recording",
   "settingsAutosaveInterval": "Auto-save interval",
   "settingsAutosaveIntervalSubtitle": "How often the recording in progress is written to disk. A crash loses at most this much audio.",
   "seconds": "{count, plural, =1{1 second} other{{count} seconds}}",
@@ -73,6 +72,7 @@
       }
     }
   },
+  "fileSizeLimitBody": "Recording stopped because this recording reached the longest a single audio file can hold. It has been saved — start a new recording to keep going.",
   "recoveredRecordingBody": "A recording that was interrupted has been recovered.",
   "stop": "Stop",
   "notificationRecording": "Recording in progress",
@@ -91,9 +91,6 @@
     }
   },
   "playbackFailed": "Could not play this recording.",
-  "settingsTranscription": "Transcription",
-  "settingsTranscriptionLanguage": "Spoken language",
-  "settingsTranscriptionLanguageSubtitle": "Automatic detects the language of each phrase, so a conversation that switches language still transcribes correctly. Choose a language if the audio is always in one.",
   "sttAuto": "Automatic",
   "sttMandarin": "Mandarin Chinese",
   "sttCantonese": "Cantonese",
@@ -115,6 +112,7 @@
   "renameExists": "A recording with that name already exists.",
   "renameFailed": "Could not rename the recording.",
   "save": "Save",
+  "transcriptLabel": "Transcript",
   "copyTranscript": "Copy transcript",
   "copied": "Transcript copied.",
   "share": "Share",
@@ -136,42 +134,67 @@
     }
   },
   "searchNoResultsHint": "Only recordings you have transcribed can be searched by what was said.",
-  "searchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
-  "@searchResultCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "searchHintNamesOnly": "Search recordings",
+  "searchNoResultsHintNamesOnly": "Search matches recording names.",
+  "transcriptionLoadFailed": "The voice model could not be loaded on this device.",
   "searchMatchedName": "Matched the name",
   "clear": "Clear",
-  "translate": "Translate",
-  "translateTo": "Translate to",
-  "translating": "Translating…",
-  "translationFailed": "Translation failed.",
-  "translationUnsupported": "This language pair cannot be translated on this device.",
-  "translationCantonese": "Cantonese translation needs an online translator, which is not available yet.",
-  "translationOf": "Translation ({language})",
-  "@translationOf": {
-    "placeholders": {
-      "language": {
-        "type": "String"
-      }
-    }
-  },
-  "translationSourceUnknown": "Translate needs a single detected language. This recording has none or several.",
-  "langEnglish": "English",
-  "langChineseSimplified": "Chinese (Simplified)",
-  "langChineseTraditional": "Chinese (Traditional)",
-  "langJapanese": "Japanese",
-  "langKorean": "Korean",
-  "langCantonese": "Cantonese",
   "liveHold": "Hold for live text",
   "liveListening": "Listening…",
   "liveStarting": "Starting…",
   "liveEmpty": "Hold the button and speak — text appears as you finish each phrase.",
   "liveUnavailable": "Download the voice model first to use live text.",
   "liveBusy": "Finish the transcription in progress first.",
-  "liveTranslateOff": "No translation"
+  "notEnoughSpaceBody": "Free up {needed} to download the voice model. {available} is free right now.",
+  "@notEnoughSpaceBody": {
+    "placeholders": {
+      "needed": {
+        "type": "String"
+      },
+      "available": {
+        "type": "String"
+      }
+    }
+  },
+  "waveformSeek": "Seek in this recording",
+  "removeTranscript": "Remove transcript",
+  "removeTranscriptTitle": "Remove this transcript?",
+  "removeTranscriptBody": "The transcript will be deleted. You can transcribe this recording again at any time.",
+  "transcriptRemoved": "Transcript removed.",
+  "livePanelHidden": "Live text hidden. Hold the subtitles button to show it again.",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "history": "History",
+  "settingsHistorySubtitle": "Every recording you have made, newest first. The home screen keeps only today's; everything else is here.",
+  "historyCount": "{count, plural, =0{No recordings} =1{1 recording} other{{count} recordings}}",
+  "@historyCount": {"placeholders": {"count": {"type": "int"}}},
+  "noRecordingsTodayTitle": "Nothing recorded today",
+  "noRecordingsTodayBody": "Tap the record button to start. Earlier recordings are in History.",
+  "openHistory": "Open History",
+  "searchNoResultsHintToday": "Only today's recordings are searched here. Use History to search everything.",
+  "playbackBlockedWhileRecording": "Stop the recording before playing another one.",
+  "hideLiveText": "Hide live text",
+  "skipSilence": "Skip silence",
+  "skipSilenceOnTitle": "Skipping silence",
+  "skipSilenceOnBody": "Only speech is recorded.",
+  "skipSilenceOffTitle": "Recording everything",
+  "skipSilenceOffBody": "Silence is recorded too.",
+  "skipSilenceUnavailable": "Skipping silence is not available on this device.",
+  "settingsTheme": "Theme",
+  "settingsThemeSubtitle": "Light or dark. Following the device is the default; choose one to override it — useful when recording in a dark room with a device set to light.",
+  "themeSystem": "Follow the device",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "noRecordingsOnDay": "Nothing recorded on this day.",
+  "noRecordingsOnDayHint": "Tap the highlighted day again to see the whole archive.",
+  "recordingReconnecting": "Lost the microphone. Reconnecting…",
+  "recordingResumed": "Recording again.",
+  "recordingInterruptedBody": "Recording stopped: the microphone stayed unavailable. Everything captured up to that point has been saved.",
+  "recordingWriteFailedBody": "Recording stopped: the audio could not be saved to this device. Everything recorded up to that point has been kept.",
+  "durationHoursMinutes": "{hours} h {minutes} min",
+  "@durationHoursMinutes": {"placeholders": {"hours": {"type": "int"}, "minutes": {"type": "int"}}},
+  "durationMinutes": "{count, plural, =0{under a minute} =1{1 min} other{{count} min}}",
+  "@durationMinutes": {"placeholders": {"count": {"type": "int"}}},
+  "settingsStorageDurations": "{recorded} recorded · about {remaining} still fits",
+  "@settingsStorageDurations": {"placeholders": {"recorded": {"type": "String"}, "remaining": {"type": "String"}}}
 }

@@ -8,6 +8,9 @@ import UIKit
   /// Matches RecordingSessionChannel on the Dart side.
   private static let recordingSessionChannelName =
     "com.idatagear.momerarecording/recording_session"
+  /// Matches DeviceInfoChannel on the Dart side.
+  private static let capabilitiesChannelName =
+    "com.idatagear.momerarecording/capabilities"
 
   override func application(
     _ application: UIApplication,
@@ -20,7 +23,69 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registerBackupChannel(with: engineBridge.pluginRegistry)
     registerRecordingSessionChannel(with: engineBridge.pluginRegistry)
-    TranslationBridge.register(with: engineBridge.pluginRegistry)
+    registerCapabilitiesChannel(with: engineBridge.pluginRegistry)
+  }
+
+  /// Answers the device questions a capability gate cannot settle from Dart.
+  ///
+  /// Best-effort by design: the Dart side treats any error as "unknown" and
+  /// stays permissive, so a failure here can never hide a feature.
+  private func registerCapabilitiesChannel(with registry: FlutterPluginRegistry) {
+    guard let registrar = registry.registrar(forPlugin: "MomeraCapabilities") else {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: AppDelegate.capabilitiesChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "freeDiskBytes":
+        result(AppDelegate.freeDiskBytes() ?? FlutterError(
+          code: "unavailable",
+          message: "Could not read free disk space",
+          details: nil))
+
+      case "describe":
+        // `physicalMemory` is a UInt64; clamp so a machine with more RAM than
+        // Int64.max (not today, but the cast is still a lie without this)
+        // cannot wrap into a negative "tiny device".
+        let physical = ProcessInfo.processInfo.physicalMemory
+        let total = physical > UInt64(Int64.max) ? Int64.max : Int64(physical)
+        result([
+          "totalMemoryBytes": total,
+          // iOS has no equivalent of Android's isLowRamDevice. The real
+          // constraint is the per-device jetsam limit, which is not readable.
+          "isLowRamDevice": false,
+        ])
+
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  /// Free space on the volume holding the app's container, or nil.
+  ///
+  /// Prefers `volumeAvailableCapacityForImportantUsage` because it counts
+  /// purgeable space — the space iOS would itself free to let a download
+  /// through — so a device that could accept the model is not told it is full.
+  /// That key is optional and can come back nil, hence the plain fallback.
+  private static func freeDiskBytes() -> Int64? {
+    let url = URL(fileURLWithPath: NSHomeDirectory())
+    if let values = try? url.resourceValues(
+      forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+      let important = values.volumeAvailableCapacityForImportantUsage
+    {
+      return important
+    }
+    if let attributes = try? FileManager.default.attributesOfFileSystem(
+      forPath: NSHomeDirectory()),
+      let free = attributes[.systemFreeSize] as? NSNumber
+    {
+      return free.int64Value
+    }
+    return nil
   }
 
   /// Exposes NSURLIsExcludedFromBackupKey to Dart.

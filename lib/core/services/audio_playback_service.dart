@@ -26,14 +26,11 @@ class AudioPlaybackService {
 
       final audioFile = File(audioPath);
       if (!await audioFile.exists()) {
-        debugPrint('AudioPlaybackService.play: file not found: $audioPath');
         throw StateError('AudioPlaybackService.play: audio file not found');
       }
 
-      debugPrint('AudioPlaybackService.play: playing audioPath=$audioPath');
       _currentlyPlaying = audioPath;
       await _player.setFilePath(audioPath);
-      debugPrint('AudioPlaybackService.play: file loaded, starting playback');
       await _player.play();
 
       _isPlaying = true;
@@ -64,22 +61,16 @@ class AudioPlaybackService {
   }
 
   Future<void> pause() async {
-    debugPrint(
-        'AudioPlaybackService.pause: currentlyPlaying=$_currentlyPlaying');
     await _player.pause();
     _isPlaying = false;
   }
 
   Future<void> resume() async {
-    debugPrint(
-        'AudioPlaybackService.resume: currentlyPlaying=$_currentlyPlaying');
     await _player.play();
     _isPlaying = true;
   }
 
   Future<void> stop() async {
-    debugPrint(
-        'AudioPlaybackService.stop: currentlyPlaying=$_currentlyPlaying');
     await _playerSubscription?.cancel();
     _playerSubscription = null;
     await _player.stop();

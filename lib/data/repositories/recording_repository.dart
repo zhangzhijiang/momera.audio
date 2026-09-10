@@ -4,9 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/audio/waveform.dart';
 import '../../core/services/transcription_service.dart';
-import '../../core/translation/translation_service.dart';
-import '../../core/translation/translator.dart';
 import '../models/recording.dart';
 
 /// Filesystem-backed store for [Recording]s.
@@ -58,7 +57,6 @@ class RecordingRepository {
           transcript: sidecar?.text,
           languages: sidecar?.languages ?? const [],
           segments: sidecar?.segments ?? const [],
-          translations: sidecar?.translations ?? const {},
         ),
       );
     }
@@ -79,8 +77,21 @@ class RecordingRepository {
       total += await entry.length();
     }
     // Note: this deliberately counts an in-progress `.pcm` too, so the storage
-    // cap accounts for audio being written right now.
+    // cap accounts for audio being written right now. It also counts the
+    // `.peaks` waveform caches — at 268 bytes each that is noise against a
+    // multi-gigabyte cap, and it is honest about disk the app actually holds.
     return total;
+  }
+
+  /// Delete a recording's transcript, keeping the audio.
+  ///
+  /// Deletes the sidecar rather than calling [saveTranscript] with empty text.
+  /// [_readTranscript] treats blank text as "no transcript", so an empty write
+  /// would clear the UI while leaving an unreachable file on disk still
+  /// counting against the storage cap.
+  Future<void> removeTranscript(String audioPath) async {
+    final sidecar = File(_transcriptPath(audioPath));
+    if (await sidecar.exists()) await sidecar.delete();
   }
 
   /// Rename a recording, moving its transcript sidecar with it.
@@ -110,6 +121,13 @@ class RecordingRepository {
     if (await oldSidecar.exists()) {
       await oldSidecar.rename(_transcriptPath(target));
     }
+    // And the waveform cache. Leaving it behind would orphan a file that still
+    // counts against the cap *and* force a full re-read of the audio the next
+    // time the renamed recording scrolls into view.
+    final oldPeaks = File(peaksPathFor(recording.path));
+    if (await oldPeaks.exists()) {
+      await oldPeaks.rename(peaksPathFor(target));
+    }
     return target;
   }
 
@@ -137,6 +155,10 @@ class RecordingRepository {
     if (await audio.exists()) await audio.delete();
     final sidecar = File(_transcriptPath(recording.path));
     if (await sidecar.exists()) await sidecar.delete();
+    // The waveform cache goes too, or it counts against the storage cap for
+    // the life of the install with no recording left to belong to.
+    final peaks = File(peaksPathFor(recording.path));
+    if (await peaks.exists()) await peaks.delete();
   }
 
   /// Persist (or overwrite) the transcript for a recording, together with the
@@ -149,15 +171,11 @@ class RecordingRepository {
     String text, {
     List<TranscriptionLanguage> languages = const [],
     List<TranscriptSegment> segments = const [],
-    Map<TranslationLanguage, TranslationOutcome> translations = const {},
   }) async {
     final payload = jsonEncode({
       'text': text,
       'languages': [for (final l in languages) l.name],
       'segments': [for (final s in segments) s.toJson()],
-      'translations': {
-        for (final e in translations.entries) e.key.name: e.value.toJson(),
-      },
     });
     await File(_transcriptPath(audioPath)).writeAsString(payload);
   }
@@ -192,23 +210,14 @@ class RecordingRepository {
           for (final raw in (decoded['segments'] as List? ?? const []))
             if (raw is Map<String, dynamic>) TranscriptSegment.fromJson(raw),
         ];
-        final translations = <TranslationLanguage, TranslationOutcome>{};
-        final rawTranslations = decoded['translations'];
-        if (rawTranslations is Map<String, dynamic>) {
-          for (final entry in rawTranslations.entries) {
-            final language = TranslationLanguage.fromName(entry.key);
-            final value = entry.value;
-            if (language != null && value is Map<String, dynamic>) {
-              translations[language] = TranslationOutcome.fromJson(value);
-            }
-          }
-        }
-        return _TranscriptSidecar(text, languages, segments, translations);
+        // A 'translations' key written by an older build is simply ignored;
+        // the next saveTranscript drops it from disk.
+        return _TranscriptSidecar(text, languages, segments);
       }
     } on FormatException {
       // Not JSON — a legacy plain-text sidecar.
     }
-    return _TranscriptSidecar(raw, const [], const [], const {});
+    return _TranscriptSidecar(raw, const [], const []);
   }
 
   /// Derive duration from the WAV byte length for our fixed recording format.
@@ -243,11 +252,9 @@ class RenameCollisionException implements Exception {
 
 /// Parsed contents of a transcript sidecar.
 class _TranscriptSidecar {
-  const _TranscriptSidecar(
-      this.text, this.languages, this.segments, this.translations);
+  const _TranscriptSidecar(this.text, this.languages, this.segments);
 
   final String text;
   final List<TranscriptionLanguage> languages;
   final List<TranscriptSegment> segments;
-  final Map<TranslationLanguage, TranslationOutcome> translations;
 }

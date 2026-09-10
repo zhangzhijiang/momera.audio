@@ -7,15 +7,22 @@ import '../../core/services/audio_recording_service.dart';
 import '../../core/search/recording_search.dart';
 import '../../core/services/recording_session_channel.dart';
 import '../../core/utils/app_theme.dart';
+import '../../core/utils/byte_format.dart';
 import '../../core/utils/duration_format.dart';
 import '../../l10n/app_localizations.dart';
+import '../providers/capability_provider.dart';
 import '../providers/live_transcript_provider.dart';
 import '../providers/recordings_provider.dart';
 import '../providers/service_providers.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/fading_notice.dart';
 import '../widgets/live_transcript_panel.dart';
+import '../widgets/no_results.dart';
 import '../widgets/record_button.dart';
 import '../widgets/recording_tile.dart';
+import '../widgets/search_field.dart';
+import '../widgets/skip_silence_button.dart';
+import 'history_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -94,6 +101,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onStopped: _onStoppedByItself,
     );
 
+    // A frozen timer with no explanation reads as a crash. Say what happened,
+    // and say when it is over.
+    recorder.onCaptureInterrupted = (interrupted) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(interrupted
+              ? l10n.recordingReconnecting
+              : l10n.recordingResumed),
+          duration: Duration(seconds: interrupted ? 10 : 2),
+        ),
+      );
+    };
+
     if (path == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,8 +124,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       return;
     }
+    // Playback and capture cannot share the audio route: on iOS just_audio
+    // activates its own session and would take this one away mid-recording, and
+    // on any device the speaker would bleed into the microphone. Tiles refuse
+    // to start playback while `isRecordingProvider` is set; audio already
+    // playing when the user hits record is stopped here.
+    await ref.read(audioPlaybackServiceProvider).stop();
+    ref.read(isRecordingProvider.notifier).state = true;
+
+    // Apply the persisted preference to this recording. Deliberately not
+    // awaited: building the detector takes a moment, and delaying the record
+    // button for it would be felt. Until it attaches everything is written,
+    // which is the safe direction to be wrong in.
+    if (settings.skipSilence && !recorder.isSkippingSilence) {
+      unawaited(recorder.setSkipSilence(true));
+    }
+
     // A new recording starts with an empty live panel.
     ref.read(liveTranscriptProvider.notifier).reset();
+
+    unawaited(_warmUpTranscription());
     setState(() {
       _isRecording = true;
       _isPaused = false;
@@ -112,6 +153,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       setState(() => _elapsed = recorder.elapsed);
     });
+  }
+
+  /// Load the speech model now, rather than under a held finger.
+  ///
+  /// Unawaited and non-throwing: warming is an optimisation, and the live hold
+  /// reports its own failure if this has not finished in time. Uses `read`
+  /// rather than the `watch` helper because this runs outside build.
+  Future<void> _warmUpTranscription() async {
+    final capabilities = ref.read(deviceCapabilityServiceProvider);
+    final transcription = ref.read(transcriptionServiceProvider);
+    if (!(await capabilities.transcription()).isVisible) return;
+    await transcription.warmUp();
   }
 
   /// Start live transcription — the user has pressed and is holding the live
@@ -127,7 +180,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     final notifier = ref.read(liveTranscriptProvider.notifier);
 
-    final started = await notifier.start(fromByteOffset: recorder.bytesWritten);
+    // Bring the panel back on press, before the await, so it is on screen
+    // showing "Starting…" rather than appearing a beat later. Left shown even
+    // if start() fails — vanishing again would make the button feel broken.
+    notifier.showPanel();
+
+    final started = await notifier.start(
+      fromByteOffset: recorder.bytesWritten,
+    );
     if (!started) {
       if (!mounted) return;
       // Two reasons it can fail, and they need different advice.
@@ -166,19 +226,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// The recording ended without the user tapping stop — the storage cap was
   /// reached, or the audio stream was interrupted. Audio up to that point is
   /// kept either way.
-  void _onStoppedByItself(RecordingResult result) {
+  void _onStoppedByItself(
+    RecordingStopReason reason,
+    RecordingResult? result,
+  ) {
     if (!mounted) return;
     _onRecordingEnded();
     ref.read(recordingsProvider.notifier).refresh();
     final l10n = AppLocalizations.of(context)!;
-    if (result.reason == RecordingStopReason.storageFull) {
-      _showStorageFull(l10n, ref.read(settingsProvider).maxStorageBytes);
+    switch (reason) {
+      case RecordingStopReason.storageFull:
+        _showStorageFull(l10n, ref.read(settingsProvider).maxStorageBytes);
+      case RecordingStopReason.fileSizeLimit:
+        // Nothing the user can change in Settings — the limit is the audio
+        // file format's — so this says what happened and moves on.
+        _showRecordingNotice(l10n.fileSizeLimitBody);
+      case RecordingStopReason.interrupted:
+        // Reached only after every reconnection attempt failed, so this is not
+        // a blip the user can wait out — it needs saying.
+        _showRecordingNotice(l10n.recordingInterruptedBody);
+      case RecordingStopReason.writeFailed:
+        // The filesystem refused a write. Distinct from storageFull, which is
+        // the app's own cap: there is no setting to raise here, so the message
+        // says what happened and confirms the audio so far survived.
+        _showRecordingNotice(l10n.recordingWriteFailedBody);
+      case RecordingStopReason.user:
+        break;
     }
   }
 
   void _onRecordingEnded() {
     _timer?.cancel();
     _timer = null;
+    ref.read(audioRecordingServiceProvider).onCaptureInterrupted = null;
+    // Re-enables playback on every tile, wherever it is on screen.
+    ref.read(isRecordingProvider.notifier).state = false;
     // Recording can end under a held finger — cap reached, interruption, or the
     // notification's Stop action — so the live pass must be torn down here too,
     // not only on button release. Leaving it running would hold the shared
@@ -209,10 +291,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  /// Turn silence-skipping on or off, and say what changed.
+  ///
+  /// The recorder is told first: if this device cannot run a detector, the
+  /// preference must not be stored, because a pill reading "on" over a
+  /// recording that keeps every sample is a lie.
+  Future<void> _toggleSkipSilence() async {
+    final l10n = AppLocalizations.of(context)!;
+    final recorder = ref.read(audioRecordingServiceProvider);
+    final wanted = !ref.read(settingsProvider).skipSilence;
+
+    final ok = await recorder.setSkipSilence(wanted);
+    if (!mounted) return;
+    if (!ok) {
+      // A SnackBar rather than the fading notice: this is a failure the user
+      // may want to read twice, and every other failure here is a SnackBar.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.skipSilenceUnavailable)),
+      );
+      return;
+    }
+
+    await ref.read(settingsProvider.notifier).setSkipSilence(wanted);
+    if (!mounted) return;
+    showFadingNotice(
+      context,
+      icon: wanted ? Icons.graphic_eq_rounded : Icons.multitrack_audio_rounded,
+      title: wanted ? l10n.skipSilenceOnTitle : l10n.skipSilenceOffTitle,
+      subtitle: wanted ? l10n.skipSilenceOnBody : l10n.skipSilenceOffBody,
+    );
+  }
+
   void _showStorageFull(AppLocalizations l10n, int limitBytes) {
+    _showRecordingNotice(l10n.storageFullBody(formatBytes(limitBytes)));
+  }
+
+  /// Explain why a recording ended on its own. Held long enough to read, since
+  /// the user was not looking at the screen when it happened.
+  void _showRecordingNotice(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(l10n.storageFullBody(formatBytes(limitBytes))),
+        content: Text(message),
         duration: const Duration(seconds: 6),
       ),
     );
@@ -220,8 +339,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     final recordingsAsync = ref.watch(recordingsProvider);
     final l10n = AppLocalizations.of(context)!;
+    // Whether this device can run transcription at all. Recording, playback,
+    // rename, share and name-search are the baseline and never depend on it.
+    final sttVisible = watchTranscriptionVisible(ref);
+    // `.select` is load-bearing: a bare watch here would rebuild the recordings
+    // list, re-run the search and rebuild every waveform on each decoded
+    // utterance — exactly what LiveTranscriptPanel is a leaf Consumer to avoid.
+    final liveDismissed =
+        ref.watch(liveTranscriptProvider.select((s) => s.dismissed));
+    // `.select` for the same reason as above: the whole settings object changes
+    // for reasons this bar does not care about.
+    final skipSilence =
+        ref.watch(settingsProvider.select((s) => s.skipSilence));
 
     // A recording recovered from an interrupted session should be explained,
     // not just silently appear in the list.
@@ -237,12 +369,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined,
-                color: AppTheme.textSecondary),
+            icon: Icon(Icons.settings_outlined,
+                color: colors.textSecondary),
             tooltip: l10n.settings,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -253,10 +385,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
         title: Text(
           l10n.appTitle,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w800,
-            color: AppTheme.textPrimary,
+            color: colors.textPrimary,
             letterSpacing: -0.3,
           ),
         ),
@@ -274,8 +406,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text(l10n.loadFailed('$e'))),
-                data: (recordings) {
-                  if (recordings.isEmpty) return const _EmptyState();
+                data: (all) {
+                  if (all.isEmpty) return const _EmptyState();
+
+                  // The home list is today's work, not an archive. Everything
+                  // older is one tap away in History, so nothing is hidden —
+                  // it is just not in the way of the next recording.
+                  final recordings = recordedToday(all);
+                  if (recordings.isEmpty) return const _NothingToday();
 
                   final query = ref.watch(searchQueryProvider);
                   final searching = query.trim().isNotEmpty;
@@ -289,18 +427,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _SearchField(
+                      SearchField(
                         controller: _searchController,
-                        hint: l10n.searchHint,
+                        // Without transcription, search still matches recording
+                        // names — so the field stays, but must not advertise
+                        // searching speech this device cannot produce.
+                        hint: sttVisible
+                            ? l10n.searchHint
+                            : l10n.searchHintNamesOnly,
                         clearTooltip: l10n.clear,
                         onChanged: (v) =>
                             ref.read(searchQueryProvider.notifier).state = v,
                       ),
+                      // States the scope of the list below it, so a missing
+                      // older recording reads as "not today" rather than
+                      // "gone".
+                      _TodayHeader(label: l10n.today),
                       if (searching && visible.isEmpty)
                         Expanded(
-                          child: _NoResults(
+                          child: NoResults(
                             message: l10n.searchNoResults(query),
-                            hint: l10n.searchNoResultsHint,
+                            // The likeliest reason for a miss here is not a
+                            // typo or a missing transcript but the scope: the
+                            // recording is older than today.
+                            hint: l10n.searchNoResultsHintToday,
                           ),
                         )
                       else
@@ -312,6 +462,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               final recording = visible[i];
                               return RecordingTile(
                                 recording: recording,
+                                alternate: i.isOdd,
                                 // Hits let the tile show where the words are
                                 // and seek playback to them.
                                 hits: [
@@ -330,8 +481,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             // Live panel sits between the list and the record bar, and only
             // exists while recording. It watches its own provider so a new
             // utterance does not rebuild the list above it.
-            if (_isRecording) const LiveTranscriptPanel(),
+            if (_isRecording && sttVisible && !liveDismissed)
+              const LiveTranscriptPanel(),
             _RecordBar(
+              liveEnabled: sttVisible,
+              skipSilence: skipSilence,
+              skipSilenceTooltip: l10n.skipSilence,
+              onToggleSkipSilence: _toggleSkipSilence,
               tapToRecordLabel: l10n.tapToRecord,
               pausedLabel: l10n.paused,
               pauseTooltip: _isPaused ? l10n.resume : l10n.pause,
@@ -353,6 +509,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 class _RecordBar extends StatelessWidget {
   const _RecordBar({
+    required this.liveEnabled,
+    required this.skipSilence,
+    required this.skipSilenceTooltip,
+    required this.onToggleSkipSilence,
     required this.tapToRecordLabel,
     required this.pausedLabel,
     required this.pauseTooltip,
@@ -365,6 +525,16 @@ class _RecordBar extends StatelessWidget {
     required this.onLivePressed,
     required this.onLiveReleased,
   });
+
+  /// Whether the hold-for-live-text button should exist. False on a device
+  /// that cannot run the speech model.
+  final bool liveEnabled;
+
+  /// Whether silence is being dropped rather than recorded.
+  final bool skipSilence;
+
+  final String skipSilenceTooltip;
+  final VoidCallback onToggleSkipSilence;
 
   final String tapToRecordLabel;
   final String pausedLabel;
@@ -380,53 +550,76 @@ class _RecordBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(top: BorderSide(color: AppTheme.borderLight)),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.borderLight)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Stacked, not laid out in a row: the timer has to stay centred on
+          // the record button below it, whatever width the toggle takes. The
+          // row is as tall as the toggle's tap target, and the gap under it is
+          // trimmed to pay that back.
           SizedBox(
-            height: 22,
-            child: isRecording
-                ? Row(
+            height: 40,
+            // Full width, or the Column's centre alignment shrinks this row to
+            // the width of the status text and `right: 0` pins the toggle to
+            // the text's edge instead of the panel's.
+            width: double.infinity,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (isRecording)
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (!isPaused) const _RecPulse(),
                       if (isPaused)
-                        const Icon(Icons.pause_rounded,
-                            size: 14, color: AppTheme.textSecondary),
+                        Icon(Icons.pause_rounded,
+                            size: 14, color: colors.textSecondary),
                       const SizedBox(width: 8),
                       Text(
                         isPaused ? '$pausedLabel · $elapsedLabel' : elapsedLabel,
-                        style: const TextStyle(
-                          fontSize: 15,
+                        style: TextStyle(
+                          fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          color: colors.textPrimary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],
                   )
-                : Text(
+                else
+                  Text(
                     tapToRecordLabel,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: colors.textSecondary,
                     ),
                   ),
+                Positioned(
+                  right: 0,
+                  child: SkipSilenceButton(
+                    enabled: skipSilence,
+                    tooltip: skipSilenceTooltip,
+                    onTap: onToggleSkipSilence,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Pause sits beside the record button and only exists while
               // recording, so the resting state stays a single obvious action.
               SizedBox(
-                width: 56,
+                width: 64,
                 child: isRecording
                     ? IconButton(
                         onPressed: onTogglePause,
@@ -435,8 +628,8 @@ class _RecordBar extends StatelessWidget {
                           isPaused
                               ? Icons.play_arrow_rounded
                               : Icons.pause_rounded,
-                          size: 26,
-                          color: AppTheme.textSecondary,
+                          size: 28,
+                          color: colors.textSecondary,
                         ),
                       )
                     : null,
@@ -446,8 +639,8 @@ class _RecordBar extends StatelessWidget {
               // bounds the extra CPU work to exactly as long as the user wants
               // to watch — releasing stops decoding immediately.
               SizedBox(
-                width: 56,
-                child: isRecording
+                width: 64,
+                child: isRecording && liveEnabled
                     ? _LiveHoldButton(
                         tooltip: liveTooltip,
                         onPressed: onLivePressed,
@@ -468,11 +661,12 @@ class _RecPulse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     return Container(
       width: 10,
       height: 10,
-      decoration: const BoxDecoration(
-        color: AppTheme.recordRed,
+      decoration: BoxDecoration(
+        color: colors.recordRed,
         shape: BoxShape.circle,
       ),
     );
@@ -484,25 +678,26 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.mic_none_rounded, size: 56, color: AppTheme.textHint),
+          Icon(Icons.mic_none_rounded, size: 56, color: colors.textHint),
           const SizedBox(height: 12),
           Text(
             l10n.noRecordingsTitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textSecondary,
+              color: colors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             l10n.noRecordingsBody,
-            style: const TextStyle(fontSize: 13, color: AppTheme.textHint),
+            style: TextStyle(fontSize: 13, color: colors.textHint),
           ),
         ],
       ),
@@ -555,6 +750,7 @@ class _LiveHoldButtonState extends State<_LiveHoldButton> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     // Deliberately no Tooltip: a tooltip fires on long-press, which is exactly
     // the gesture that operates this control, so it would pop up over the UI
     // every single time the button is used. The panel header above already
@@ -568,16 +764,16 @@ class _LiveHoldButtonState extends State<_LiveHoldButton> {
         onPointerCancel: (_) => _release(),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _held ? AppTheme.accentLight : Colors.transparent,
+            color: _held ? colors.accentLight : Colors.transparent,
           ),
           child: Icon(
             Icons.subtitles_rounded,
-            size: 24,
-            color: _held ? AppTheme.accent : AppTheme.textSecondary,
+            size: 26,
+            color: _held ? colors.accent : colors.textSecondary,
           ),
         ),
       ),
@@ -585,96 +781,78 @@ class _LiveHoldButtonState extends State<_LiveHoldButton> {
   }
 }
 
-/// Search field pinned above the recording list.
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.hint,
-    required this.clearTooltip,
-    required this.onChanged,
-  });
 
-  final TextEditingController controller;
-  final String hint;
-  final String clearTooltip;
-  final ValueChanged<String> onChanged;
+/// The "Today" label above the home list.
+///
+/// Small and quiet on purpose: it is a scope note, not a section the user is
+/// meant to act on. It matches the day headers in History so the two lists read
+/// as one system.
+class _TodayHeader extends StatelessWidget {
+  const _TodayHeader({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        textInputAction: TextInputAction.search,
-        style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(fontSize: 14, color: AppTheme.textHint),
-          prefixIcon:
-              const Icon(Icons.search_rounded, size: 20, color: AppTheme.textHint),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, _) {
-              if (value.text.isEmpty) return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    size: 18, color: AppTheme.textHint),
-                tooltip: clearTooltip,
-                onPressed: () {
-                  controller.clear();
-                  onChanged('');
-                },
-              );
-            },
-          ),
-          isDense: true,
-          filled: true,
-          fillColor: AppTheme.surface,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+          color: colors.textHint,
         ),
       ),
     );
   }
 }
 
-class _NoResults extends StatelessWidget {
-  const _NoResults({required this.message, required this.hint});
-
-  final String message;
-  final String hint;
+/// Shown when recordings exist but none of them are from today.
+///
+/// Distinct from [_EmptyState], which means the app has never recorded
+/// anything: here the user's audio is safe and one tap away, and saying so is
+/// the whole job of this screen.
+class _NothingToday extends StatelessWidget {
+  const _NothingToday();
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off_rounded,
-                size: 48, color: AppTheme.textHint),
+            Icon(Icons.mic_none_rounded, size: 56, color: colors.textHint),
             const SizedBox(height: 12),
             Text(
-              message,
+              l10n.noRecordingsTodayTitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
+              style: TextStyle(
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textSecondary,
+                color: colors.textSecondary,
               ),
             ),
-            const SizedBox(height: 6),
-            // The most likely reason for a miss is not a typo but that the
-            // recording was never transcribed. Say so.
+            const SizedBox(height: 4),
             Text(
-              hint,
+              l10n.noRecordingsTodayBody,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppTheme.textHint),
+              style: TextStyle(fontSize: 13, color: colors.textHint),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
+              ),
+              icon: const Icon(Icons.history_rounded, size: 18),
+              label: Text(l10n.openHistory),
+              style: TextButton.styleFrom(foregroundColor: colors.accent),
             ),
           ],
         ),

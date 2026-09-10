@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/transcription_service.dart';
-import '../../core/translation/translation_service.dart';
 import '../../data/models/recording.dart';
 import 'service_providers.dart';
 
@@ -48,14 +47,21 @@ class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
     List<TranscriptionLanguage> languages = const [],
     List<TranscriptSegment> segments = const [],
   }) async {
+    // Look the entry up by path rather than trusting the handle the caller
+    // captured before a multi-second transcription: it may since have had its
+    // transcript removed, and writing here would recreate the sidecar the user
+    // just deleted.
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final live = _byPath(current, recording.path);
+    if (live == null) return;
+
     await ref.read(recordingRepositoryProvider).saveTranscript(
           recording.path,
           transcript,
           languages: languages,
           segments: segments,
         );
-    final current = state.valueOrNull;
-    if (current == null) return;
     state = AsyncData([
       for (final r in current)
         r.path == recording.path
@@ -68,24 +74,25 @@ class RecordingsNotifier extends AsyncNotifier<List<Recording>> {
     ]);
   }
 
-  /// Store a translation alongside the transcript and update it in place.
-  Future<void> addTranslation(
-    Recording recording,
-    TranslationOutcome outcome,
-  ) async {
-    final merged = {...recording.translations, outcome.language: outcome};
-    await ref.read(recordingRepositoryProvider).saveTranscript(
-          recording.path,
-          recording.transcript ?? '',
-          languages: recording.languages,
-          segments: recording.segments,
-          translations: merged,
-        );
+  /// The current entry for [path], or null if it is gone.
+  Recording? _byPath(List<Recording> recordings, String path) {
+    for (final r in recordings) {
+      if (r.path == path) return r;
+    }
+    return null;
+  }
+
+  /// Delete a recording's transcript, keeping the audio.
+  ///
+  /// Mutates in place rather than calling [refresh]: an `AsyncLoading` flash
+  /// would re-sort the list and blink the very tile the user just acted on.
+  Future<void> removeTranscript(Recording recording) async {
+    await ref.read(recordingRepositoryProvider).removeTranscript(recording.path);
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData([
       for (final r in current)
-        r.path == recording.path ? r.copyWith(translations: merged) : r,
+        r.path == recording.path ? r.copyWith(clearTranscript: true) : r,
     ]);
   }
 
@@ -101,3 +108,24 @@ final recordingsProvider =
     AsyncNotifierProvider<RecordingsNotifier, List<Recording>>(
   RecordingsNotifier.new,
 );
+
+/// The recordings made today, newest first.
+///
+/// "Today" is the device's local calendar day, not the last 24 hours: a
+/// recording made last night is yesterday's the moment midnight passes, which
+/// is what a person means by the word. The home screen shows exactly this list;
+/// everything else is reached through History.
+///
+/// [now] is injectable so the boundary can be tested without waiting for
+/// midnight.
+List<Recording> recordedToday(List<Recording> all, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  return [
+    for (final r in all)
+      if (isSameDay(r.createdAt, today)) r,
+  ];
+}
+
+/// Whether two local timestamps fall on the same calendar day.
+bool isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;

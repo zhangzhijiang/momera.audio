@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/services/transcription_service.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/repositories/settings_repository.dart';
 import 'recordings_provider.dart';
@@ -41,8 +40,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
   Future<void> setAutosaveInterval(Duration interval) =>
       _update(state.copyWith(autosaveInterval: interval));
 
-  Future<void> setTranscriptionLanguage(TranscriptionLanguage language) =>
-      _update(state.copyWith(transcriptionLanguage: language));
+  Future<void> setSkipSilence(bool skip) =>
+      _update(state.copyWith(skipSilence: skip));
+
+  Future<void> setThemeMode(AppThemeMode mode) =>
+      _update(state.copyWith(themeMode: mode));
 
   Future<void> _update(AppSettings next) async {
     state = next;
@@ -61,5 +63,18 @@ final storageUsedProvider = FutureProvider<int>((ref) async {
 });
 
 
-/// The active search query. Empty means "show everything".
+/// The home screen's search query, over today's recordings. Empty means "show
+/// everything from today".
 final searchQueryProvider = StateProvider<String>((ref) => '');
+
+/// The day History is filtered to, or null for the whole archive.
+///
+/// Held here rather than in the screen so a round trip into a recording and
+/// back does not silently widen the list the user narrowed.
+final historySelectedDayProvider = StateProvider<DateTime?>((ref) => null);
+
+/// History's search query, over every recording ever made.
+///
+/// Separate from [searchQueryProvider] so the two fields never filter each
+/// other: each one's scope has to match the list drawn under it.
+final historySearchQueryProvider = StateProvider<String>((ref) => '');

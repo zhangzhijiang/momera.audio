@@ -217,6 +217,12 @@ abstract class AppLocalizations {
   /// **'Language used throughout the app'**
   String get settingsLanguageSubtitle;
 
+  /// No description provided for @settingsInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'About this setting'**
+  String get settingsInfo;
+
   /// No description provided for @languageSystem.
   ///
   /// In en, this message translates to:
@@ -241,12 +247,6 @@ abstract class AppLocalizations {
   /// **'繁體中文'**
   String get languageChineseTraditional;
 
-  /// No description provided for @settingsStorage.
-  ///
-  /// In en, this message translates to:
-  /// **'Storage'**
-  String get settingsStorage;
-
   /// No description provided for @settingsMaxStorage.
   ///
   /// In en, this message translates to:
@@ -256,7 +256,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMaxStorageSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Recording stops when your recordings reach this size.'**
+  /// **'Recording stops when your recordings reach this size. The times shown are lengths of audio — with Skip silence on, a session can run for longer than that.'**
   String get settingsMaxStorageSubtitle;
 
   /// No description provided for @settingsStorageUsed.
@@ -264,12 +264,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{used} of {total} used'**
   String settingsStorageUsed(String used, String total);
-
-  /// No description provided for @settingsRecording.
-  ///
-  /// In en, this message translates to:
-  /// **'Recording'**
-  String get settingsRecording;
 
   /// No description provided for @settingsAutosaveInterval.
   ///
@@ -294,6 +288,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recording stopped because your recordings reached the {limit} limit. Delete some recordings or raise the limit in Settings.'**
   String storageFullBody(String limit);
+
+  /// No description provided for @fileSizeLimitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording stopped because this recording reached the longest a single audio file can hold. It has been saved — start a new recording to keep going.'**
+  String get fileSizeLimitBody;
 
   /// No description provided for @recoveredRecordingBody.
   ///
@@ -342,24 +342,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not play this recording.'**
   String get playbackFailed;
-
-  /// No description provided for @settingsTranscription.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcription'**
-  String get settingsTranscription;
-
-  /// No description provided for @settingsTranscriptionLanguage.
-  ///
-  /// In en, this message translates to:
-  /// **'Spoken language'**
-  String get settingsTranscriptionLanguage;
-
-  /// No description provided for @settingsTranscriptionLanguageSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Automatic detects the language of each phrase, so a conversation that switches language still transcribes correctly. Choose a language if the audio is always in one.'**
-  String get settingsTranscriptionLanguageSubtitle;
 
   /// No description provided for @sttAuto.
   ///
@@ -445,6 +427,12 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get save;
 
+  /// No description provided for @transcriptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get transcriptLabel;
+
   /// No description provided for @copyTranscript.
   ///
   /// In en, this message translates to:
@@ -529,11 +517,23 @@ abstract class AppLocalizations {
   /// **'Only recordings you have transcribed can be searched by what was said.'**
   String get searchNoResultsHint;
 
-  /// No description provided for @searchResultCount.
+  /// No description provided for @searchHintNamesOnly.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 result} other{{count} results}}'**
-  String searchResultCount(int count);
+  /// **'Search recordings'**
+  String get searchHintNamesOnly;
+
+  /// No description provided for @searchNoResultsHintNamesOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Search matches recording names.'**
+  String get searchNoResultsHintNamesOnly;
+
+  /// No description provided for @transcriptionLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The voice model could not be loaded on this device.'**
+  String get transcriptionLoadFailed;
 
   /// No description provided for @searchMatchedName.
   ///
@@ -546,90 +546,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear'**
   String get clear;
-
-  /// No description provided for @translate.
-  ///
-  /// In en, this message translates to:
-  /// **'Translate'**
-  String get translate;
-
-  /// No description provided for @translateTo.
-  ///
-  /// In en, this message translates to:
-  /// **'Translate to'**
-  String get translateTo;
-
-  /// No description provided for @translating.
-  ///
-  /// In en, this message translates to:
-  /// **'Translating…'**
-  String get translating;
-
-  /// No description provided for @translationFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Translation failed.'**
-  String get translationFailed;
-
-  /// No description provided for @translationUnsupported.
-  ///
-  /// In en, this message translates to:
-  /// **'This language pair cannot be translated on this device.'**
-  String get translationUnsupported;
-
-  /// No description provided for @translationCantonese.
-  ///
-  /// In en, this message translates to:
-  /// **'Cantonese translation needs an online translator, which is not available yet.'**
-  String get translationCantonese;
-
-  /// No description provided for @translationOf.
-  ///
-  /// In en, this message translates to:
-  /// **'Translation ({language})'**
-  String translationOf(String language);
-
-  /// No description provided for @translationSourceUnknown.
-  ///
-  /// In en, this message translates to:
-  /// **'Translate needs a single detected language. This recording has none or several.'**
-  String get translationSourceUnknown;
-
-  /// No description provided for @langEnglish.
-  ///
-  /// In en, this message translates to:
-  /// **'English'**
-  String get langEnglish;
-
-  /// No description provided for @langChineseSimplified.
-  ///
-  /// In en, this message translates to:
-  /// **'Chinese (Simplified)'**
-  String get langChineseSimplified;
-
-  /// No description provided for @langChineseTraditional.
-  ///
-  /// In en, this message translates to:
-  /// **'Chinese (Traditional)'**
-  String get langChineseTraditional;
-
-  /// No description provided for @langJapanese.
-  ///
-  /// In en, this message translates to:
-  /// **'Japanese'**
-  String get langJapanese;
-
-  /// No description provided for @langKorean.
-  ///
-  /// In en, this message translates to:
-  /// **'Korean'**
-  String get langKorean;
-
-  /// No description provided for @langCantonese.
-  ///
-  /// In en, this message translates to:
-  /// **'Cantonese'**
-  String get langCantonese;
 
   /// No description provided for @liveHold.
   ///
@@ -667,11 +583,233 @@ abstract class AppLocalizations {
   /// **'Finish the transcription in progress first.'**
   String get liveBusy;
 
-  /// No description provided for @liveTranslateOff.
+  /// No description provided for @notEnoughSpaceBody.
   ///
   /// In en, this message translates to:
-  /// **'No translation'**
-  String get liveTranslateOff;
+  /// **'Free up {needed} to download the voice model. {available} is free right now.'**
+  String notEnoughSpaceBody(String needed, String available);
+
+  /// No description provided for @waveformSeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Seek in this recording'**
+  String get waveformSeek;
+
+  /// No description provided for @removeTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove transcript'**
+  String get removeTranscript;
+
+  /// No description provided for @removeTranscriptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this transcript?'**
+  String get removeTranscriptTitle;
+
+  /// No description provided for @removeTranscriptBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The transcript will be deleted. You can transcribe this recording again at any time.'**
+  String get removeTranscriptBody;
+
+  /// No description provided for @transcriptRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript removed.'**
+  String get transcriptRemoved;
+
+  /// No description provided for @livePanelHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Live text hidden. Hold the subtitles button to show it again.'**
+  String get livePanelHidden;
+
+  /// No description provided for @today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// No description provided for @yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get yesterday;
+
+  /// No description provided for @history.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get history;
+
+  /// No description provided for @settingsHistorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every recording you have made, newest first. The home screen keeps only today\'s; everything else is here.'**
+  String get settingsHistorySubtitle;
+
+  /// No description provided for @historyCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No recordings} =1{1 recording} other{{count} recordings}}'**
+  String historyCount(int count);
+
+  /// No description provided for @noRecordingsTodayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing recorded today'**
+  String get noRecordingsTodayTitle;
+
+  /// No description provided for @noRecordingsTodayBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the record button to start. Earlier recordings are in History.'**
+  String get noRecordingsTodayBody;
+
+  /// No description provided for @openHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Open History'**
+  String get openHistory;
+
+  /// No description provided for @searchNoResultsHintToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Only today\'s recordings are searched here. Use History to search everything.'**
+  String get searchNoResultsHintToday;
+
+  /// No description provided for @playbackBlockedWhileRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the recording before playing another one.'**
+  String get playbackBlockedWhileRecording;
+
+  /// No description provided for @hideLiveText.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide live text'**
+  String get hideLiveText;
+
+  /// No description provided for @skipSilence.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip silence'**
+  String get skipSilence;
+
+  /// No description provided for @skipSilenceOnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipping silence'**
+  String get skipSilenceOnTitle;
+
+  /// No description provided for @skipSilenceOnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Only speech is recorded.'**
+  String get skipSilenceOnBody;
+
+  /// No description provided for @skipSilenceOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording everything'**
+  String get skipSilenceOffTitle;
+
+  /// No description provided for @skipSilenceOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Silence is recorded too.'**
+  String get skipSilenceOffBody;
+
+  /// No description provided for @skipSilenceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipping silence is not available on this device.'**
+  String get skipSilenceUnavailable;
+
+  /// No description provided for @settingsTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// No description provided for @settingsThemeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Light or dark. Following the device is the default; choose one to override it — useful when recording in a dark room with a device set to light.'**
+  String get settingsThemeSubtitle;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the device'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @noRecordingsOnDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing recorded on this day.'**
+  String get noRecordingsOnDay;
+
+  /// No description provided for @noRecordingsOnDayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the highlighted day again to see the whole archive.'**
+  String get noRecordingsOnDayHint;
+
+  /// No description provided for @recordingReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost the microphone. Reconnecting…'**
+  String get recordingReconnecting;
+
+  /// No description provided for @recordingResumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording again.'**
+  String get recordingResumed;
+
+  /// No description provided for @recordingInterruptedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording stopped: the microphone stayed unavailable. Everything captured up to that point has been saved.'**
+  String get recordingInterruptedBody;
+
+  /// No description provided for @recordingWriteFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording stopped: the audio could not be saved to this device. Everything recorded up to that point has been kept.'**
+  String get recordingWriteFailedBody;
+
+  /// No description provided for @durationHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min'**
+  String durationHoursMinutes(int hours, int minutes);
+
+  /// No description provided for @durationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{under a minute} =1{1 min} other{{count} min}}'**
+  String durationMinutes(int count);
+
+  /// No description provided for @settingsStorageDurations.
+  ///
+  /// In en, this message translates to:
+  /// **'{recorded} recorded · about {remaining} still fits'**
+  String settingsStorageDurations(String recorded, String remaining);
 }
 
 class _AppLocalizationsDelegate

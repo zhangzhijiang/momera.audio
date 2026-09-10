@@ -72,6 +72,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSubtitle => 'Language used throughout the app';
 
   @override
+  String get settingsInfo => 'About this setting';
+
+  @override
   String get languageSystem => 'System default';
 
   @override
@@ -84,22 +87,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageChineseTraditional => '繁體中文';
 
   @override
-  String get settingsStorage => 'Storage';
-
-  @override
   String get settingsMaxStorage => 'Maximum storage';
 
   @override
   String get settingsMaxStorageSubtitle =>
-      'Recording stops when your recordings reach this size.';
+      'Recording stops when your recordings reach this size. The times shown are lengths of audio — with Skip silence on, a session can run for longer than that.';
 
   @override
   String settingsStorageUsed(String used, String total) {
     return '$used of $total used';
   }
-
-  @override
-  String get settingsRecording => 'Recording';
 
   @override
   String get settingsAutosaveInterval => 'Auto-save interval';
@@ -123,6 +120,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String storageFullBody(String limit) {
     return 'Recording stopped because your recordings reached the $limit limit. Delete some recordings or raise the limit in Settings.';
   }
+
+  @override
+  String get fileSizeLimitBody =>
+      'Recording stopped because this recording reached the longest a single audio file can hold. It has been saved — start a new recording to keep going.';
 
   @override
   String get recoveredRecordingBody =>
@@ -150,16 +151,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playbackFailed => 'Could not play this recording.';
-
-  @override
-  String get settingsTranscription => 'Transcription';
-
-  @override
-  String get settingsTranscriptionLanguage => 'Spoken language';
-
-  @override
-  String get settingsTranscriptionLanguageSubtitle =>
-      'Automatic detects the language of each phrase, so a conversation that switches language still transcribes correctly. Choose a language if the audio is always in one.';
 
   @override
   String get sttAuto => 'Automatic';
@@ -204,6 +195,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get save => 'Save';
+
+  @override
+  String get transcriptLabel => 'Transcript';
 
   @override
   String get copyTranscript => 'Copy transcript';
@@ -251,68 +245,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only recordings you have transcribed can be searched by what was said.';
 
   @override
-  String searchResultCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count results',
-      one: '1 result',
-    );
-    return '$_temp0';
-  }
+  String get searchHintNamesOnly => 'Search recordings';
+
+  @override
+  String get searchNoResultsHintNamesOnly => 'Search matches recording names.';
+
+  @override
+  String get transcriptionLoadFailed =>
+      'The voice model could not be loaded on this device.';
 
   @override
   String get searchMatchedName => 'Matched the name';
 
   @override
   String get clear => 'Clear';
-
-  @override
-  String get translate => 'Translate';
-
-  @override
-  String get translateTo => 'Translate to';
-
-  @override
-  String get translating => 'Translating…';
-
-  @override
-  String get translationFailed => 'Translation failed.';
-
-  @override
-  String get translationUnsupported =>
-      'This language pair cannot be translated on this device.';
-
-  @override
-  String get translationCantonese =>
-      'Cantonese translation needs an online translator, which is not available yet.';
-
-  @override
-  String translationOf(String language) {
-    return 'Translation ($language)';
-  }
-
-  @override
-  String get translationSourceUnknown =>
-      'Translate needs a single detected language. This recording has none or several.';
-
-  @override
-  String get langEnglish => 'English';
-
-  @override
-  String get langChineseSimplified => 'Chinese (Simplified)';
-
-  @override
-  String get langChineseTraditional => 'Chinese (Traditional)';
-
-  @override
-  String get langJapanese => 'Japanese';
-
-  @override
-  String get langKorean => 'Korean';
-
-  @override
-  String get langCantonese => 'Cantonese';
 
   @override
   String get liveHold => 'Hold for live text';
@@ -335,5 +281,151 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveBusy => 'Finish the transcription in progress first.';
 
   @override
-  String get liveTranslateOff => 'No translation';
+  String notEnoughSpaceBody(String needed, String available) {
+    return 'Free up $needed to download the voice model. $available is free right now.';
+  }
+
+  @override
+  String get waveformSeek => 'Seek in this recording';
+
+  @override
+  String get removeTranscript => 'Remove transcript';
+
+  @override
+  String get removeTranscriptTitle => 'Remove this transcript?';
+
+  @override
+  String get removeTranscriptBody =>
+      'The transcript will be deleted. You can transcribe this recording again at any time.';
+
+  @override
+  String get transcriptRemoved => 'Transcript removed.';
+
+  @override
+  String get livePanelHidden =>
+      'Live text hidden. Hold the subtitles button to show it again.';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get yesterday => 'Yesterday';
+
+  @override
+  String get history => 'History';
+
+  @override
+  String get settingsHistorySubtitle =>
+      'Every recording you have made, newest first. The home screen keeps only today\'s; everything else is here.';
+
+  @override
+  String historyCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recordings',
+      one: '1 recording',
+      zero: 'No recordings',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get noRecordingsTodayTitle => 'Nothing recorded today';
+
+  @override
+  String get noRecordingsTodayBody =>
+      'Tap the record button to start. Earlier recordings are in History.';
+
+  @override
+  String get openHistory => 'Open History';
+
+  @override
+  String get searchNoResultsHintToday =>
+      'Only today\'s recordings are searched here. Use History to search everything.';
+
+  @override
+  String get playbackBlockedWhileRecording =>
+      'Stop the recording before playing another one.';
+
+  @override
+  String get hideLiveText => 'Hide live text';
+
+  @override
+  String get skipSilence => 'Skip silence';
+
+  @override
+  String get skipSilenceOnTitle => 'Skipping silence';
+
+  @override
+  String get skipSilenceOnBody => 'Only speech is recorded.';
+
+  @override
+  String get skipSilenceOffTitle => 'Recording everything';
+
+  @override
+  String get skipSilenceOffBody => 'Silence is recorded too.';
+
+  @override
+  String get skipSilenceUnavailable =>
+      'Skipping silence is not available on this device.';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsThemeSubtitle =>
+      'Light or dark. Following the device is the default; choose one to override it — useful when recording in a dark room with a device set to light.';
+
+  @override
+  String get themeSystem => 'Follow the device';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get noRecordingsOnDay => 'Nothing recorded on this day.';
+
+  @override
+  String get noRecordingsOnDayHint =>
+      'Tap the highlighted day again to see the whole archive.';
+
+  @override
+  String get recordingReconnecting => 'Lost the microphone. Reconnecting…';
+
+  @override
+  String get recordingResumed => 'Recording again.';
+
+  @override
+  String get recordingInterruptedBody =>
+      'Recording stopped: the microphone stayed unavailable. Everything captured up to that point has been saved.';
+
+  @override
+  String get recordingWriteFailedBody =>
+      'Recording stopped: the audio could not be saved to this device. Everything recorded up to that point has been kept.';
+
+  @override
+  String durationHoursMinutes(int hours, int minutes) {
+    return '$hours h $minutes min';
+  }
+
+  @override
+  String durationMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count min',
+      one: '1 min',
+      zero: 'under a minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsStorageDurations(String recorded, String remaining) {
+    return '$recorded recorded · about $remaining still fits';
+  }
 }

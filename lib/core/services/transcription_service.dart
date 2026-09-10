@@ -1,17 +1,20 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 
 import '../../utils/model_asset_helper.dart';
+import '../audio/wav.dart';
+import '../capabilities/device_capability_service.dart';
+import 'decode_worker.dart';
 
 /// Languages the SenseVoice model can recognise.
 ///
 /// The checkpoint is `sense-voice-zh-en-ja-ko-yue`, and those five are the
 /// whole list. The token vocabulary contains tags for many more languages
 /// (inherited from the vocab it was built on) but this checkpoint is not
-/// trained for them — notably **Spanish is not supported**, even though the app
-/// UI is available in Spanish.
+/// trained for them.
 enum TranscriptionLanguage {
   /// Detect per speech segment. The model's default, and the right choice for
   /// a conversation that switches language between utterances.
@@ -119,13 +122,41 @@ class ModelNotReadyException implements Exception {
 /// Thrown when the shared recogniser is already in use by the other path.
 ///
 /// File transcription and live transcription share one `OfflineRecognizer`
-/// (loading a second would cost another ~228 MB), and it cannot be driven from
-/// both at once. The UI prevents this by disabling whichever action is not
+/// (loading a second would cost another ~228 MB). Individual decodes are
+/// serialised by [DecodeWorker], but the two *passes* still cannot overlap:
+/// each drives a VAD across `await` gaps, and the file pass resets its detector
+/// at the start. The UI prevents this by disabling whichever action is not
 /// running; this exception is the backstop.
 class TranscriptionBusyException implements Exception {
   const TranscriptionBusyException();
   @override
   String toString() => 'The recogniser is already transcribing.';
+}
+
+/// Thrown when sherpa-onnx's native library will not load on this device.
+///
+/// Permanent: a missing `.so`, or an ABI the build does not ship. The device
+/// should stop being offered transcription.
+class SttNativeUnavailableException implements Exception {
+  const SttNativeUnavailableException(this.cause);
+  final Object cause;
+  @override
+  String toString() =>
+      'The speech recognition engine is not available on this device: $cause';
+}
+
+/// Thrown when the model was found but could not be loaded.
+///
+/// Note that this only covers *catchable* failures — a bad or truncated model
+/// file, a rejected config. A genuine out-of-memory inside onnxruntime never
+/// gets here: it aborts the process on Android and is SIGKILLed by jetsam on
+/// iOS. That case is caught instead by the breadcrumb
+/// `DeviceCapabilityService.recordModelLoadStarted` writes before the load.
+class SttModelLoadFailedException implements Exception {
+  const SttModelLoadFailedException(this.cause);
+  final Object cause;
+  @override
+  String toString() => 'The speech model could not be loaded: $cause';
 }
 
 /// Offline, file-based speech-to-text.
@@ -135,16 +166,36 @@ class TranscriptionBusyException implements Exception {
 /// the concatenated text. There is no real-time/streaming path — transcription
 /// is an explicit action the user runs on an already-saved recording.
 class TranscriptionService {
+  TranscriptionService({DeviceCapabilityService? capabilities})
+      : _capabilities = capabilities;
+
+  /// Records whether the model actually loaded, so a device that cannot run it
+  /// stops being offered transcription. Optional so the service stays
+  /// constructible in tests without a preference store.
+  final DeviceCapabilityService? _capabilities;
+
   static const int _sampleRate = 16000;
   static const int _vadWindowSamples = 512; // Silero VAD window size
 
-  /// VAD windows to process between yields to the event loop. 512 samples is
-  /// 32 ms of audio, so this is roughly a second of audio per yield — often
-  /// enough to keep the UI smooth, rare enough not to dominate the run.
-  static const int _yieldThreshold = 32;
+  /// Bytes of PCM read from disk at a time.
+  ///
+  /// 32 KiB is 16384 samples, which is exactly 32 VAD windows, so a read
+  /// boundary never splits a window and the loop yields to the event loop about
+  /// once per second of audio.
+  ///
+  /// Reading in chunks is what keeps peak memory flat. Loading the whole file
+  /// and converting it in one go — as this did before — allocated a Float32List
+  /// of the entire recording: ~460 MB for two hours, on top of the ~228 MB
+  /// model, which is an out-of-memory kill on most phones. The storage cap
+  /// permits far longer recordings than that.
+  static const int _readChunkBytes = 32 * 1024;
 
   sherpa_onnx.OfflineRecognizer? _recognizer;
   sherpa_onnx.VoiceActivityDetector? _vad;
+
+  /// Decodes utterances off the main isolate. Null only when the isolate could
+  /// not be spawned, in which case decoding falls back to this isolate.
+  DecodeWorker? _worker;
 
   /// Language the recogniser was built with. Changing it requires rebuilding
   /// the recogniser, so it is tracked to detect a stale one.
@@ -162,7 +213,7 @@ class TranscriptionService {
   }) async {
     // The language is baked into the recogniser at construction, so a change
     // means tearing the old one down rather than ignoring the new setting.
-    if (isInitialized && language != _language) dispose();
+    if (isInitialized && language != _language) await dispose();
     if (isInitialized) return;
     _language = language;
 
@@ -170,7 +221,13 @@ class TranscriptionService {
       throw const ModelNotReadyException();
     }
 
-    sherpa_onnx.initBindings();
+    try {
+      sherpa_onnx.initBindings();
+    } catch (e) {
+      // A missing or wrong-ABI native library. Permanent, and distinct from a
+      // model problem — the caller turns this into a capability verdict.
+      throw SttNativeUnavailableException(e);
+    }
     final modelPaths = await ModelAssetHelper.resolveModelPaths();
 
     final senseVoice = sherpa_onnx.OfflineSenseVoiceModelConfig(
@@ -181,25 +238,51 @@ class TranscriptionService {
       language: language.code,
       useInverseTextNormalization: true,
     );
-    _recognizer = sherpa_onnx.OfflineRecognizer(
-      sherpa_onnx.OfflineRecognizerConfig(
-        model: sherpa_onnx.OfflineModelConfig(
-          senseVoice: senseVoice,
-          tokens: modelPaths.tokensPath,
-          numThreads: 4,
-          debug: false,
+
+    // Everything between the breadcrumb and its clearing is the risky part:
+    // loading 228 MB of weights. If the process dies in here — an OOM abort on
+    // Android, a jetsam kill on iOS — nothing below runs, and the pending flag
+    // left in storage is what tells the next launch this device could not do it.
+    await _capabilities?.recordModelLoadStarted();
+    try {
+      _recognizer = sherpa_onnx.OfflineRecognizer(
+        sherpa_onnx.OfflineRecognizerConfig(
+          model: sherpa_onnx.OfflineModelConfig(
+            senseVoice: senseVoice,
+            tokens: modelPaths.tokensPath,
+            numThreads: 4,
+            debug: false,
+          ),
+          decodingMethod: 'greedy_search',
+          maxActivePaths: 4,
         ),
-        decodingMethod: 'greedy_search',
-        maxActivePaths: 4,
-      ),
-    );
+      );
+    } catch (e) {
+      await _capabilities?.recordModelLoadFailed(e);
+      throw SttModelLoadFailedException(e);
+    }
+    await _capabilities?.recordModelLoadSucceeded();
+
+    // Decoding runs on a worker isolate against this same native recogniser —
+    // see [DecodeWorker] for how the pointer crosses. If the isolate cannot be
+    // spawned the service is degraded, not broken: decoding falls back to this
+    // isolate, exactly as it behaved before.
+    try {
+      _worker = await DecodeWorker.spawn(
+        recognizerAddress: _recognizer!.ptr.address,
+      );
+    } catch (e) {
+      _worker = null;
+      debugPrint('TranscriptionService: decode worker unavailable ($e); '
+          'decoding on the main isolate instead');
+    }
 
     _vad = sherpa_onnx.VoiceActivityDetector(
       config: sherpa_onnx.VadModelConfig(
         sileroVad: sherpa_onnx.SileroVadModelConfig(
           model: modelPaths.vadModelPath,
           threshold: 0.5,
-          minSilenceDuration: 0.25,
+          minSilenceDuration: 0.5,
           minSpeechDuration: 0.25,
           windowSize: _vadWindowSamples,
           maxSpeechDuration: 15.0,
@@ -254,10 +337,6 @@ class TranscriptionService {
     String wavPath, {
     void Function(double progress)? onProgress,
   }) async {
-    final bytes = await File(wavPath).readAsBytes();
-    final pcm = _extractPcmData(bytes);
-    final samples = _convertPcm16ToFloat32(pcm);
-
     final vad = _vad!;
     vad.reset();
 
@@ -267,37 +346,79 @@ class TranscriptionService {
     final detected = <TranscriptionLanguage>[];
     final segments = <TranscriptSegment>[];
 
-    // Feed the audio to the VAD in fixed windows and transcribe each completed
-    // speech segment.
-    int offset = 0;
-    int sinceYield = 0;
-    while (offset + _vadWindowSamples <= samples.length) {
-      final window =
-          Float32List.sublistView(samples, offset, offset + _vadWindowSamples);
-      vad.acceptWaveform(window);
-      while (!vad.isEmpty()) {
-        _appendSegment(vad.front(), buffer, detected, segments);
-        vad.pop();
-        // Decoding a segment is the expensive step; always yield after one.
-        sinceYield = _yieldThreshold;
+    final file = File(wavPath);
+    final raf = await file.open();
+    try {
+      final region = await locatePcmRegion(raf, await file.length());
+      if (region.isEmpty) {
+        onProgress?.call(1.0);
+        return const TranscriptionResult(text: '', languages: []);
       }
-      offset += _vadWindowSamples;
 
-      sinceYield++;
-      if (sinceYield >= _yieldThreshold) {
-        sinceYield = 0;
-        onProgress?.call(offset / samples.length);
-        // Hand the event loop a turn so the UI can paint.
+      // One reusable window: `acceptWaveform` copies into native memory, so the
+      // buffer can be refilled in place instead of allocated per window.
+      final window = Float32List(_vadWindowSamples);
+      var fill = 0;
+      int? pendingByte;
+
+      var position = region.offset;
+      final end = region.offset + region.length;
+      await raf.setPosition(position);
+
+      while (position < end) {
+        final read = await raf.read(math.min(_readChunkBytes, end - position));
+        if (read.isEmpty) break;
+        position += read.length;
+
+        // A short read can split a sample across chunks; carrying the odd byte
+        // over keeps every later sample aligned rather than turning the rest of
+        // the recording into noise.
+        final Uint8List chunk;
+        if (pendingByte == null) {
+          chunk = read;
+        } else {
+          chunk = Uint8List(read.length + 1)
+            ..[0] = pendingByte
+            ..setRange(1, read.length + 1, read);
+          pendingByte = null;
+        }
+        final wholeSamples = chunk.length ~/ 2;
+        if (chunk.length.isOdd) pendingByte = chunk[chunk.length - 1];
+
+        final data = ByteData.sublistView(chunk);
+        for (var i = 0; i < wholeSamples; i++) {
+          window[fill++] = data.getInt16(i * 2, Endian.little) / 32768.0;
+          if (fill < _vadWindowSamples) continue;
+
+          vad.acceptWaveform(window);
+          fill = 0;
+          while (!vad.isEmpty()) {
+            // Pop before awaiting: `front()` hands back a copy of the samples,
+            // so draining the queue synchronously keeps the detector's state
+            // from straddling a suspension point.
+            final speech = vad.front();
+            vad.pop();
+            await _appendSegment(speech, buffer, detected, segments);
+          }
+        }
+
+        onProgress?.call((position - region.offset) / region.length);
+        // Hand the event loop a turn so the UI can paint. Once per chunk is
+        // about once per second of audio; decoding a segment awaits the worker
+        // isolate and yields on its own.
         await Future<void>.delayed(Duration.zero);
       }
-    }
 
-    // Flush any trailing speech the VAD has not yet emitted.
-    vad.flush();
-    while (!vad.isEmpty()) {
-      _appendSegment(vad.front(), buffer, detected, segments);
-      vad.pop();
-      await Future<void>.delayed(Duration.zero);
+      // Flush any trailing speech the VAD has not yet emitted. A sub-window
+      // tail of under 512 samples (32 ms) is dropped, as it always has been.
+      vad.flush();
+      while (!vad.isEmpty()) {
+        final speech = vad.front();
+        vad.pop();
+        await _appendSegment(speech, buffer, detected, segments);
+      }
+    } finally {
+      await raf.close();
     }
 
     onProgress?.call(1.0);
@@ -308,13 +429,14 @@ class TranscriptionService {
     );
   }
 
-  void _appendSegment(
+  Future<void> _appendSegment(
     sherpa_onnx.SpeechSegment segment,
     StringBuffer out,
     List<TranscriptionLanguage> detected,
     List<TranscriptSegment> segments,
-  ) {
-    final decoded = decodeSegment(segment.samples, startSamples: segment.start);
+  ) async {
+    final decoded =
+        await decodeSegment(segment.samples, startSamples: segment.start);
     if (decoded == null) return;
 
     if (out.isNotEmpty) out.write(' ');
@@ -341,21 +463,25 @@ class TranscriptionService {
   /// relative to wherever *it* began being fed, which differs between a
   /// whole-file pass and a live pass that starts mid-recording.
   ///
-  /// **Blocking.** `decode` is a native call with no yield point inside it, so
-  /// the calling isolate is stalled for its duration.
-  TranscriptSegment? decodeSegment(
+  /// Runs on the [DecodeWorker] isolate, so awaiting this does not stall the
+  /// UI. It falls back to a blocking on-isolate decode only when the worker
+  /// could not be spawned.
+  ///
+  /// Throws if the worker died mid-decode — a lost segment is not silently
+  /// swallowed here, because for file transcription that would present an
+  /// incomplete transcript as a complete one. The live path catches it and
+  /// drops the phrase instead.
+  Future<TranscriptSegment?> decodeSegment(
     Float32List samples, {
     required int startSamples,
-  }) {
+  }) async {
     if (_recognizer == null || samples.isEmpty) return null;
-    final stream = _recognizer!.createStream();
-    stream.acceptWaveform(samples: samples, sampleRate: _sampleRate);
-    _recognizer!.decode(stream);
-    final result = _recognizer!.getResult(stream);
-    stream.free();
 
-    final text = result.text.trim();
-    if (text.isEmpty) return null;
+    final worker = _worker;
+    final decoded = worker != null && worker.isRunning
+        ? await worker.decode(samples, sampleRate: _sampleRate)
+        : _decodeOnThisIsolate(samples);
+    if (decoded == null) return null;
 
     final start =
         Duration(milliseconds: (startSamples * 1000 / _sampleRate).round());
@@ -363,16 +489,71 @@ class TranscriptionService {
       start: start,
       end: start +
           Duration(milliseconds: (samples.length * 1000 / _sampleRate).round()),
-      text: text,
-      language: TranscriptionLanguage.fromTag(result.lang),
+      text: decoded.text,
+      language: TranscriptionLanguage.fromTag(decoded.lang),
     );
+  }
+
+  /// Decode without leaving this isolate.
+  ///
+  /// **Blocking** — `decode` is a native call with no yield point, so the
+  /// isolate is stalled for its duration. Only reached when [DecodeWorker]
+  /// could not be spawned, where a stuttering transcript beats none at all.
+  DecodedUtterance? _decodeOnThisIsolate(Float32List samples) {
+    final recognizer = _recognizer;
+    if (recognizer == null) return null;
+    final stream = recognizer.createStream();
+    try {
+      stream.acceptWaveform(samples: samples, sampleRate: _sampleRate);
+      recognizer.decode(stream);
+      final result = recognizer.getResult(stream);
+      final text = result.text.trim();
+      if (text.isEmpty) return null;
+      return DecodedUtterance(text: text, lang: result.lang);
+    } finally {
+      stream.free();
+    }
   }
 
   /// Paths needed to build a second VAD for the live path, and proof the model
   /// is loaded. Null until [initialize] has run.
-  Future<ModelPaths?> modelPathsIfReady() async {
-    if (!isInitialized) return null;
+  Future<ModelPaths?> modelPathsIfReady({
+    TranscriptionLanguage language = TranscriptionLanguage.auto,
+  }) async {
+    // Previously this returned null whenever the recogniser had not been built
+    // yet, and the recogniser was only ever built by `transcribeFile` or the
+    // download sheet. So on a cold launch with the model already on disk, the
+    // first live hold reported "Download the voice model first" — the app
+    // refusing a capability it had. Loading it here is the correct answer to
+    // "is the model ready", and `warmUp` keeps it off the critical path.
+    if (!isInitialized) {
+      if (!await ModelAssetHelper.isModelReady()) return null;
+      try {
+        await initialize(language: language);
+      } catch (e) {
+        debugPrint('TranscriptionService: could not initialize for the live '
+            'path: $e');
+        return null;
+      }
+    }
     return ModelAssetHelper.resolveModelPaths();
+  }
+
+  /// Build the recogniser ahead of time, ignoring failure.
+  ///
+  /// Called when recording starts so the ~228 MB load does not happen under a
+  /// held finger. Never throws: warming is an optimisation, and anything that
+  /// goes wrong here will be reported properly by the real call that follows.
+  Future<void> warmUp({
+    TranscriptionLanguage language = TranscriptionLanguage.auto,
+  }) async {
+    if (isInitialized) return;
+    if (!await ModelAssetHelper.isModelReady()) return;
+    try {
+      await initialize(language: language);
+    } catch (e) {
+      debugPrint('TranscriptionService: warm-up failed: $e');
+    }
   }
 
   /// Guards the shared recogniser.
@@ -394,7 +575,14 @@ class TranscriptionService {
 
   void release() => _busy = false;
 
-  void dispose() {
+  /// Tear down the recogniser, the VAD and the decode worker.
+  ///
+  /// The worker is stopped *first* and awaited: it holds a handle to the same
+  /// native recogniser, so freeing that while an inference is still running
+  /// would pull the model out from under it.
+  Future<void> dispose() async {
+    await _worker?.shutdown();
+    _worker = null;
     _vad?.free();
     _vad = null;
     _recognizer?.free();
@@ -402,37 +590,4 @@ class TranscriptionService {
     debugPrint('TranscriptionService disposed');
   }
 
-  // --- WAV / PCM helpers ----------------------------------------------------
-
-  /// Extract the raw PCM bytes from a WAV file by locating its `data` chunk.
-  /// Falls back to skipping the canonical 44-byte header if no chunk is found.
-  Uint8List _extractPcmData(Uint8List bytes) {
-    if (bytes.length < 44) return Uint8List(0);
-    final data = ByteData.sublistView(bytes);
-
-    // Walk chunks after the 12-byte RIFF header to find "data".
-    int offset = 12;
-    while (offset + 8 <= bytes.length) {
-      final id = String.fromCharCodes(bytes.sublist(offset, offset + 4));
-      final size = data.getUint32(offset + 4, Endian.little);
-      final body = offset + 8;
-      if (id == 'data') {
-        final end = (body + size <= bytes.length) ? body + size : bytes.length;
-        return Uint8List.sublistView(bytes, body, end);
-      }
-      // Chunks are word-aligned (padded to even length).
-      offset = body + size + (size.isOdd ? 1 : 0);
-    }
-    return Uint8List.sublistView(bytes, 44);
-  }
-
-  Float32List _convertPcm16ToFloat32(Uint8List pcm16) {
-    final numSamples = pcm16.length ~/ 2;
-    final out = Float32List(numSamples);
-    final data = ByteData.sublistView(pcm16);
-    for (int i = 0; i < numSamples; i++) {
-      out[i] = data.getInt16(i * 2, Endian.little) / 32768.0;
-    }
-    return out;
-  }
 }

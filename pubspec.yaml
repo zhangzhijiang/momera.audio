@@ -1,7 +1,7 @@
 name: momera_recording
 description: A recorder with offline speech-to-text transcription.
 publish_to: "none"
-version: 1.0.0+3
+version: 1.0.0+9
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations: # UI in English, Spanish, Simplified & Traditional Chinese
+  flutter_localizations: # UI in English, Chinese (both scripts), Japanese, Korean
     sdk: flutter
 
   # State management
@@ -31,13 +31,21 @@ dependencies:
   intl: ^0.20.2
   shared_preferences: ^2.3.2 # persists the settings screen's choices
   share_plus: ^10.1.2 # share recordings and transcripts to other apps
-  google_mlkit_translation: ^0.15.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Drives integration_test/store_screenshots.dart, which is how the Play and
+  # App Store screenshot matrices are captured. See idatagear_app_release/.
+  integration_test:
+    sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: "^0.14.4"
+  # Both are already transitive deps of path_provider; declared here so
+  # test/capture_stall_test.dart may import them to stub the documents
+  # directory, which is the documented way to fake path_provider.
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
 
 flutter:
   uses-material-design: true
@@ -49,12 +57,34 @@ flutter:
     # small. Only the small support files are bundled below.
     - assets/models/sensevoice/tokens.txt
     - assets/models/silero_vad/silero_vad.onnx
-    - assets/icon/
+    # assets/icon/ is deliberately NOT bundled. Those PNGs are build-time input
+    # for flutter_launcher_icons, which reads them off disk; nothing loads them
+    # at runtime, so shipping them put ~1.8 MB of unreachable images in the app.
 
-# Flutter Launcher Icons configuration
+# Flutter Launcher Icons configuration — regenerate with:
+#   dart run flutter_launcher_icons
+#
+# mark_color_1024.png / mark_mono_1024.png are momera_recording_logo.png with
+# its near-white ground knocked out to alpha (the source PNG has none). They are
+# generated, not hand-drawn; tool/icon/extract_mark.py rebuilds them.
 flutter_launcher_icons:
+  image_path: "assets/icon/momera_recording_logo.png"
+  min_sdk_android: 24
+
   android: "launcher_icon"
+  adaptive_icon_background: "#FDFDFD"
+  adaptive_icon_foreground: "assets/icon/mark_color_1024.png"
+  # MUST be 0. The default is 16, which this package emits as an
+  # `android:inset="16%"` around the foreground layer; the mark is already sized
+  # to sit on the 66/108dp safe circle, so an extra inset shrinks it to ~38% of
+  # the layer and the icon reads as tiny.
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: "assets/icon/mark_mono_1024.png"
+
   ios: true
   remove_alpha_ios: true # App Store rejects a 1024 icon with an alpha channel
-  image_path: "assets/icon/momera_logo.png"
-  min_sdk_android: 21
+  # Supplying these two switches the iOS output to the modern single-size
+  # asset format (light/dark/tinted) instead of the legacy per-size set.
+  image_path_ios_dark_transparent: "assets/icon/mark_color_1024.png"
+  image_path_ios_tinted_grayscale: "assets/icon/mark_mono_1024.png"
+  desaturate_tinted_to_grayscale_ios: false # already flat white

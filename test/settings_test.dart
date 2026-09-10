@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:momera_recording/data/models/app_settings.dart';
 import 'package:momera_recording/l10n/app_localizations.dart';
 import 'package:momera_recording/main.dart';
+import 'package:momera_recording/core/utils/byte_format.dart';
+import 'package:momera_recording/presentation/providers/recordings_provider.dart';
+import 'package:momera_recording/data/models/recording.dart';
+import 'package:momera_recording/presentation/screens/history_screen.dart';
+import 'package:momera_recording/presentation/providers/settings_provider.dart';
 import 'package:momera_recording/presentation/screens/settings_screen.dart';
 import 'package:momera_recording/presentation/widgets/recording_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -94,6 +101,10 @@ void main() {
       expect(settings.language, AppLanguage.system);
       expect(settings.autosaveInterval, const Duration(seconds: 10));
       expect(settings.maxStorageBytes, 2 * 1024 * 1024 * 1024);
+      // Off by default: dropping audio has to be a choice the user makes, not
+      // one they discover after the recording.
+      expect(settings.skipSilence, isFalse);
+      expect(settings.themeMode, AppThemeMode.system);
     });
 
     test('the default values are offered in the pickers', () {
@@ -130,10 +141,14 @@ void main() {
   });
 
   group('SettingsScreen', () {
-    testWidgets('shows every section and the default values', (tester) async {
+    Future<void> pumpSettings(
+      WidgetTester tester, {
+      List<Override> overrides = const [],
+    }) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: overrides,
+          child: const MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: SettingsScreen(),
@@ -141,6 +156,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('shows every row and the default values', (tester) async {
+      await pumpSettings(tester);
 
       expect(find.text('Settings'), findsOneWidget);
       expect(find.text('System default'), findsOneWidget);
@@ -148,18 +167,132 @@ void main() {
       expect(find.text('10 seconds'), findsOneWidget);
     });
 
-    testWidgets('picking a language updates the displayed value',
+    testWidgets('offers no spoken-language setting', (tester) async {
+      // Recognition is always automatic: asking the user to pin a language
+      // before recording asks a question they cannot answer, and can only make
+      // results worse than per-segment detection. The section headers went with
+      // it, since every remaining group held a single row.
+      await pumpSettings(tester);
+
+      expect(find.text('Spoken language'), findsNothing);
+      expect(find.text('TRANSCRIPTION'), findsNothing);
+      expect(find.text('STORAGE'), findsNothing);
+      expect(find.text('RECORDING'), findsNothing);
+    });
+
+    testWidgets('the info icon explains a setting, and closes cleanly',
         (tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: SettingsScreen(),
+      await pumpSettings(tester);
+
+      // The explanation is not on screen until asked for — that is the point
+      // of moving it off the row.
+      const explanation = 'Recording stops when your recordings reach this '
+          'size. The times shown are lengths of audio — with Skip silence on, '
+          'a session can run for longer than that.';
+      expect(find.text(explanation), findsNothing);
+
+      // Found through its own row rather than by position: the row order is
+      // deliberate (see the order test below) and free to change again.
+      await tester.tap(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Maximum storage'),
+            matching: find.byType(ListTile),
           ),
+          matching: find.byTooltip('About this setting'),
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.text(explanation), findsOneWidget);
+
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(explanation), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reports storage as bytes, as recorded time, and as time left',
+        (tester) async {
+      // 1 GB used of the 2 GB default leaves 1 GB, which at 16 kHz mono PCM16
+      // (32000 bytes a second) is 9 h 19 min of audio.
+      await pumpSettings(tester, overrides: [
+        storageUsedProvider.overrideWith((ref) async => 1024 * 1024 * 1024),
+        recordingsProvider.overrideWith(
+          () => _FixedRecordings(const [
+            Duration(hours: 1),
+            Duration(minutes: 30),
+          ]),
+        ),
+      ]);
+
+      expect(find.text('1 GB of 2 GB used\n'
+          '1 h 30 min recorded · about 9 h 19 min still fits'),
+          findsOneWidget);
+    });
+
+    testWidgets('says nothing about time until the sizes are known',
+        (tester) async {
+      // Better a row with no footer for a frame than one claiming zero hours.
+      await pumpSettings(tester, overrides: [
+        storageUsedProvider.overrideWith((ref) => Completer<int>().future),
+      ]);
+
+      expect(find.textContaining('still fits'), findsNothing);
+    });
+
+    testWidgets('lists the rows in the agreed order, ending in History',
+        (tester) async {
+      await pumpSettings(tester);
+
+      // Language first because it changes every other string on screen;
+      // History last because it navigates away instead of setting a value.
+      final titles = tester
+          .widgetList<Text>(find.descendant(
+            of: find.byType(ListTile),
+            matching: find.byType(Text),
+          ))
+          .map((t) => t.data)
+          .toList();
+      expect(
+        titles,
+        containsAllInOrder(<String>[
+          'Language',
+          'Theme',
+          'Auto-save interval',
+          'Maximum storage',
+          'History',
+        ]),
+      );
+    });
+
+    testWidgets('the History row opens History, not a picker', (tester) async {
+      // Without a store the list never resolves and its spinner animates
+      // forever, so nothing in the tree would ever settle.
+      await pumpSettings(tester,
+          overrides: [recordingsProvider.overrideWith(_NoRecordings.new)]);
+
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HistoryScreen), findsOneWidget);
+    });
+
+    testWidgets('tapping the row still opens the picker, not the explanation',
+        (tester) async {
+      await pumpSettings(tester);
+
+      await tester.tap(find.text('Maximum storage'));
+      await tester.pumpAndSettle();
+
+      // The sheet lists every storage option; the info dialog would not.
+      expect(find.text('512 MB'), findsOneWidget);
+      expect(find.text('10 GB'), findsOneWidget);
+    });
+
+    testWidgets('picking a language updates the displayed value',
+        (tester) async {
+      await pumpSettings(tester);
 
       await tester.tap(find.text('System default'));
       await tester.pumpAndSettle();
@@ -170,4 +303,28 @@ void main() {
       expect(find.text('日本語'), findsOneWidget);
     });
   });
+}
+
+/// A store that resolves immediately, with nothing in it.
+class _NoRecordings extends RecordingsNotifier {
+  @override
+  Future<List<Recording>> build() async => const [];
+}
+
+/// A store that resolves immediately, with recordings of the given lengths.
+class _FixedRecordings extends RecordingsNotifier {
+  _FixedRecordings(this.lengths);
+
+  final List<Duration> lengths;
+
+  @override
+  Future<List<Recording>> build() async => [
+        for (var i = 0; i < lengths.length; i++)
+          Recording(
+            path: '/tmp/recording_$i.wav',
+            createdAt: DateTime(2026, 1, 1, i),
+            sizeBytes: 0,
+            duration: lengths[i],
+          ),
+      ];
 }

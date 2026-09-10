@@ -1,7 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-import '../../core/services/transcription_service.dart';
-
 /// The UI languages Momera Recorder ships.
 ///
 /// These mirror the five languages the speech model can transcribe, so the
@@ -33,6 +31,23 @@ enum AppLanguage {
       );
 }
 
+/// Which theme the app renders in.
+///
+/// [system] follows the device's own light/dark setting, which is what most
+/// people expect and the default. The explicit choices exist because a
+/// recorder is often used in a dark room with the device set to light, or the
+/// reverse.
+enum AppThemeMode {
+  system,
+  light,
+  dark;
+
+  static AppThemeMode fromName(String? name) => AppThemeMode.values.firstWhere(
+        (m) => m.name == name,
+        orElse: () => AppThemeMode.system,
+      );
+}
+
 /// User-configurable settings, persisted across launches.
 @immutable
 class AppSettings {
@@ -40,7 +55,8 @@ class AppSettings {
     this.language = AppLanguage.system,
     this.maxStorageBytes = defaultMaxStorageBytes,
     this.autosaveInterval = defaultAutosaveInterval,
-    this.transcriptionLanguage = TranscriptionLanguage.auto,
+    this.skipSilence = defaultSkipSilence,
+    this.themeMode = AppThemeMode.system,
   });
 
   /// 2 GB. Roughly 18 hours at 16 kHz mono PCM16 (~1.83 MB/minute), which is
@@ -50,6 +66,11 @@ class AppSettings {
   /// How often an in-progress recording is flushed to disk. A crash or force
   /// quit loses at most this much audio.
   static const Duration defaultAutosaveInterval = Duration(seconds: 10);
+
+  /// Off by default: recording everything is the behaviour a voice recorder is
+  /// expected to have, and dropping audio is a choice the user must make rather
+  /// than discover after the fact.
+  static const bool defaultSkipSilence = false;
 
   /// Offered in the settings UI.
   static const List<int> storageOptions = [
@@ -71,24 +92,26 @@ class AppSettings {
   final int maxStorageBytes;
   final Duration autosaveInterval;
 
-  /// Which language the recogniser is told to expect. `auto` detects per
-  /// speech segment, which is what makes a conversation that switches language
-  /// transcribe correctly; pinning a language helps when content is known to
-  /// be monolingual.
-  final TranscriptionLanguage transcriptionLanguage;
+  /// Whether silence is dropped instead of recorded. Toggled from the record
+  /// panel rather than the settings screen, because it is a decision about the
+  /// recording you are about to make.
+  final bool skipSilence;
+
+  final AppThemeMode themeMode;
 
   AppSettings copyWith({
     AppLanguage? language,
     int? maxStorageBytes,
     Duration? autosaveInterval,
-    TranscriptionLanguage? transcriptionLanguage,
+    bool? skipSilence,
+    AppThemeMode? themeMode,
   }) {
     return AppSettings(
       language: language ?? this.language,
       maxStorageBytes: maxStorageBytes ?? this.maxStorageBytes,
       autosaveInterval: autosaveInterval ?? this.autosaveInterval,
-      transcriptionLanguage:
-          transcriptionLanguage ?? this.transcriptionLanguage,
+      skipSilence: skipSilence ?? this.skipSilence,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -98,13 +121,10 @@ class AppSettings {
       other.language == language &&
       other.maxStorageBytes == maxStorageBytes &&
       other.autosaveInterval == autosaveInterval &&
-      other.transcriptionLanguage == transcriptionLanguage;
+      other.skipSilence == skipSilence &&
+      other.themeMode == themeMode;
 
   @override
   int get hashCode => Object.hash(
-        language,
-        maxStorageBytes,
-        autosaveInterval,
-        transcriptionLanguage,
-      );
+      language, maxStorageBytes, autosaveInterval, skipSilence, themeMode);
 }

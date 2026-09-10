@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../audio/silence_gate.dart';
 import '../audio/wav.dart';
 import 'recording_session_channel.dart';
+import 'vad_speech_detector.dart';
 
 /// Why a recording stopped.
 enum RecordingStopReason {
@@ -17,8 +20,60 @@ enum RecordingStopReason {
   /// The storage cap from settings was reached. Audio up to that point is kept.
   storageFull,
 
-  /// The microphone stream ended or errored. Audio up to that point is kept.
+  /// The recording hit the largest payload a WAV file can describe (about 37
+  /// hours at our format). Audio up to that point is kept; the limit is the
+  /// container's, not the user's settings, so it is reported separately from
+  /// [storageFull] rather than blaming a cap the user could raise.
+  fileSizeLimit,
+
+  /// The microphone stream ended, errored, or went silently dead and could not
+  /// be rebuilt. Audio up to that point is kept.
   interrupted,
+
+  /// Audio could not be written to disk. Audio already flushed is kept.
+  ///
+  /// Separate from [storageFull], which is the app's own configurable cap: this
+  /// is the filesystem refusing a write, so there is no setting to raise and
+  /// nothing the user can delete inside the app to fix it.
+  writeFailed,
+}
+
+/// The microphone, behind a seam.
+///
+/// Exists so the stall watchdog can be tested. The failure it guards against —
+/// a capture stream that goes quiet without erroring and without ending — is by
+/// definition one the platform never announces, so it cannot be provoked from a
+/// real [AudioRecorder] on demand. A fake source can simply stop emitting,
+/// which is exactly the situation that used to freeze a recording for good.
+///
+/// The default implementation is the `record` plugin and behaves identically to
+/// the direct calls this replaced.
+abstract class CaptureSource {
+  Future<bool> hasPermission();
+
+  /// Begin capture and return the stream of PCM buffers.
+  Future<Stream<Uint8List>> start(RecordConfig config);
+
+  Future<void> stop();
+
+  void dispose();
+}
+
+class _RecordPluginCapture implements CaptureSource {
+  final AudioRecorder _recorder = AudioRecorder();
+
+  @override
+  Future<bool> hasPermission() => _recorder.hasPermission();
+
+  @override
+  Future<Stream<Uint8List>> start(RecordConfig config) =>
+      _recorder.startStream(config);
+
+  @override
+  Future<void> stop() => _recorder.stop();
+
+  @override
+  void dispose() => _recorder.dispose();
 }
 
 /// Outcome of a finished recording.
@@ -50,12 +105,29 @@ class RecordingResult {
 /// * The storage cap can be enforced continuously, since the exact byte count
 ///   is known as it is written.
 ///
+/// **Skipping silence** is optional and off by default. When on, a [SilenceGate]
+/// filters each chunk before anything else sees it, so the byte budget, the
+/// elapsed time and the live transcript's offsets all continue to describe the
+/// file that is actually being written — the recording is simply shorter than
+/// the session that produced it.
+///
 /// **Staying alive in the background** is delegated to
 /// [RecordingSessionChannel]: an Android foreground service with a persistent
 /// notification, and an iOS audio session under `UIBackgroundModes: audio`.
 class AudioRecordingService {
-  AudioRecordingService({RecordingSessionChannel? session})
-      : _session = session ?? const RecordingSessionChannel();
+  AudioRecordingService({
+    RecordingSessionChannel? session,
+    Future<SpeechDetector?> Function()? detectorFactory,
+    CaptureSource? capture,
+    Duration? stallTimeout,
+    Duration? watchdogInterval,
+    int? maxCaptureRestarts,
+  })  : _session = session ?? const RecordingSessionChannel(),
+        _detectorFactory = detectorFactory ?? VadSpeechDetector.tryCreate,
+        _capture = capture ?? _RecordPluginCapture(),
+        _stallTimeout = stallTimeout ?? _defaultStallTimeout,
+        _watchdogInterval = watchdogInterval ?? _defaultWatchdogInterval,
+        _maxCaptureRestarts = maxCaptureRestarts ?? _defaultMaxCaptureRestarts;
 
   static const String _dirName = 'recordings';
   static const String _filePrefix = 'recording';
@@ -66,8 +138,67 @@ class AudioRecordingService {
   /// extension left behind at launch is an interrupted recording.
   static const String pcmExtension = '.pcm';
 
-  final AudioRecorder _recorder = AudioRecorder();
+  /// How capture is configured, on the first attempt and on every rebuild after
+  /// an interruption.
+  static const RecordConfig _captureConfig = RecordConfig(
+    encoder: AudioEncoder.pcm16bits,
+    sampleRate: sampleRate,
+    numChannels: channels,
+    // "Keep recording until the user taps stop" means surviving a phone call.
+    // The plugin's default (`pause`) stops on interruption and waits for a
+    // manual resume that never comes, silently ending the recording;
+    // `pauseResume` picks capture back up by itself.
+    audioInterruption: AudioInterruptionMode.pauseResume,
+    iosConfig: IosRecordConfig(
+      // A ringing call no longer interrupts — only actually answering one does.
+      allowHapticsAndSystemSoundsDuringRecording: true,
+    ),
+  );
+
+  /// How many times capture may be rebuilt before a recording gives up.
+  ///
+  /// Bounded on purpose: a microphone taken by another app, or a permission
+  /// revoked mid-recording, will never come back, and retrying forever would
+  /// burn the battery of a device whose owner thinks they are recording.
+  static const int _defaultMaxCaptureRestarts = 20;
+
+  /// Longest wait between attempts, once the backoff has grown into it.
+  static const Duration _maxRestartBackoff = Duration(seconds: 3);
+
+  /// How long capture may deliver nothing at all before it is treated as dead.
+  ///
+  /// This is the load-bearing number for the whole recovery story. An
+  /// interrupted microphone very often signals **neither** an error nor an end
+  /// of stream — the platform simply stops handing over buffers, most commonly
+  /// when another app takes the microphone or an aggressive ROM freezes this
+  /// process in the background. Nothing in a `listen()` callback can observe
+  /// that, so without a clock nobody ever calls [_restartCapture] and the
+  /// recording is frozen for good while still looking live.
+  ///
+  /// Six seconds is far longer than any legitimate gap — buffers arrive tens of
+  /// times a second — while still being short enough that the user sees
+  /// "reconnecting" rather than a dead timer.
+  static const Duration _defaultStallTimeout = Duration(seconds: 6);
+
+  /// How often the stall check runs.
+  static const Duration _defaultWatchdogInterval = Duration(seconds: 2);
+
+  final CaptureSource _capture;
   final RecordingSessionChannel _session;
+
+  /// Watchdog timings, overridable so a test can provoke a stall in
+  /// milliseconds instead of waiting out the real six seconds.
+  final Duration _stallTimeout;
+  final Duration _watchdogInterval;
+
+  /// Retry budget, overridable for the same reason: exhausting twenty attempts
+  /// at the real backoff takes over a minute.
+  final int _maxCaptureRestarts;
+
+  /// Builds the speech detector behind the silence gate. Injectable so tests
+  /// can exercise both the working path and the unsupported-device path without
+  /// a native library.
+  final Future<SpeechDetector?> Function() _detectorFactory;
 
   StreamSubscription<Uint8List>? _subscription;
   IOSink? _sink;
@@ -75,10 +206,64 @@ class AudioRecordingService {
   Timer? _flushTimer;
   Completer<RecordingResult?>? _finished;
 
+  /// Watches for capture going quiet. See [_stallTimeout].
+  Timer? _watchdog;
+
+  /// Wall-clock time the platform last handed over a buffer.
+  ///
+  /// Deliberately wall-clock and deliberately stamped for *every* buffer —
+  /// including ones dropped because the recording is paused or because the
+  /// silence gate rejected them. The question this answers is "is capture
+  /// alive", which is not the same question as "are bytes being written": with
+  /// silence-skipping on, a quiet room legitimately writes nothing for minutes.
+  DateTime? _lastChunkAt;
+
+  /// True between rebuilding capture and the first buffer arriving on the new
+  /// stream, i.e. while a recovery is claimed but not yet proven.
+  bool _awaitingFirstChunk = false;
+
+  /// Restart attempts spent since capture last actually delivered audio.
+  ///
+  /// Held across calls rather than being a loop-local counter, because the
+  /// watchdog can call [_restartCapture] repeatedly. A per-call counter would
+  /// hand each call a fresh budget and retry a dead microphone forever.
+  int _restartAttemptsUsed = 0;
+
+  /// Where a recording that ends by itself is reported. Held as a field so the
+  /// watchdog can end a recording it started no part of.
+  void Function(RecordingStopReason reason, RecordingResult? result)?
+      _onStopped;
+
+  /// Drops silence before it is written, when the user has asked for that.
+  /// Null means every sample is kept, which is the default.
+  SilenceGate? _gate;
+
+  /// What the user asked for, which is not the same as what is running: the
+  /// detector is built asynchronously, and a device that cannot build one keeps
+  /// recording everything.
+  bool _skipSilenceWanted = false;
+
   bool _isRecording = false;
   bool _isPaused = false;
   int _bytesWritten = 0;
   int _byteBudget = 0;
+
+  /// True when [_byteBudget] came from the WAV container limit rather than the
+  /// user's storage cap, so running out is reported as the right kind of stop.
+  bool _cappedByFileSize = false;
+
+  /// True while capture is being rebuilt after an interruption.
+  bool _restarting = false;
+
+  /// How many times capture has been rebuilt during this recording. Exposed for
+  /// diagnostics: a recording that survived three interruptions is worth being
+  /// able to see.
+  int _captureRestarts = 0;
+  int get captureRestarts => _captureRestarts;
+
+  /// Fires when capture drops out and again when it comes back, so the UI can
+  /// say what is happening rather than showing a timer that has quietly frozen.
+  void Function(bool interrupted)? onCaptureInterrupted;
 
   bool get isRecording => _isRecording;
 
@@ -107,7 +292,46 @@ class AudioRecordingService {
   Duration get elapsed => durationForPcmBytes(_bytesWritten,
       sampleRate: sampleRate, channels: channels);
 
-  Future<bool> hasPermission() => _recorder.hasPermission();
+  Future<bool> hasPermission() => _capture.hasPermission();
+
+  /// Whether silence is currently being dropped rather than written.
+  bool get isSkippingSilence => _gate != null;
+
+  /// Turn silence-skipping on or off. Safe to call mid-recording; it takes
+  /// effect on the next chunk of audio.
+  ///
+  /// Returns false when [skip] was true but no detector could be built — a
+  /// 32-bit process, a missing native library, a failed asset copy. The
+  /// recording continues either way, keeping every sample: silently writing the
+  /// wrong thing, or refusing to record at all, are both worse than saying the
+  /// feature is unavailable here.
+  Future<bool> setSkipSilence(bool skip) async {
+    _skipSilenceWanted = skip;
+
+    if (!skip) {
+      _gate?.dispose();
+      _gate = null;
+      return true;
+    }
+    if (_gate != null) return true;
+
+    final detector = await _detectorFactory();
+    // The user may have turned it off again while the detector was loading.
+    if (!_skipSilenceWanted) {
+      detector?.dispose();
+      return true;
+    }
+    if (detector == null) {
+      _skipSilenceWanted = false;
+      return false;
+    }
+    final gate = SilenceGate(detector: detector);
+    // Switched on mid-recording there is no pre-roll to fall back on, so let
+    // audio through until the detector has had a chance to speak up.
+    if (_isRecording) gate.openForResume();
+    _gate = gate;
+    return true;
+  }
 
   Future<Directory> recordingsDir() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -126,12 +350,15 @@ class AudioRecordingService {
   /// a recording is already running, or there is no space at all.
   ///
   /// [onStopped] fires when the recording ends for a reason other than the user
-  /// tapping stop, so the UI can react (and explain) without polling.
+  /// tapping stop, so the UI can react (and explain) without polling. Its result
+  /// is null when there was no audio worth keeping — the UI still has to be told,
+  /// or it is left showing a recording that is over.
   Future<String?> startRecording({
     required int availableBytes,
     required Duration flushInterval,
     RecordingNotificationText? notification,
-    void Function(RecordingResult result)? onStopped,
+    void Function(RecordingStopReason reason, RecordingResult? result)?
+        onStopped,
   }) async {
     if (_isRecording) return null;
     if (availableBytes <= 0) return null;
@@ -144,23 +371,7 @@ class AudioRecordingService {
 
     final Stream<Uint8List> stream;
     try {
-      stream = await _recorder.startStream(
-        const RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          sampleRate: sampleRate,
-          numChannels: channels,
-          // "Keep recording until the user taps stop" means surviving a phone
-          // call. The plugin's default (`pause`) stops on interruption and
-          // waits for a manual resume that never comes, silently ending the
-          // recording; `pauseResume` picks capture back up by itself.
-          audioInterruption: AudioInterruptionMode.pauseResume,
-          iosConfig: IosRecordConfig(
-            // A ringing call no longer interrupts — only actually answering
-            // one does.
-            allowHapticsAndSystemSoundsDuringRecording: true,
-          ),
-        ),
-      );
+      stream = await _capture.start(_captureConfig);
     } catch (e) {
       debugPrint('AudioRecordingService: could not start stream: $e');
       return null;
@@ -170,41 +381,177 @@ class AudioRecordingService {
     _sink = pcmFile.openWrite();
     _isPaused = false;
     _bytesWritten = 0;
-    _byteBudget = availableBytes;
+    // A gate carried over from the previous recording must not open this one
+    // with audio captured before it started.
+    _gate?.reset();
+    // A single recording is capped by the WAV container as well as by the
+    // user's storage setting. The storage options go up to 10 GB, which is well
+    // past the ~4 GiB a 32-bit RIFF size can describe, so without this clamp a
+    // long enough recording would finalise into a silently corrupt file.
+    _byteBudget = math.min(availableBytes, maxWavDataBytes);
+    _cappedByFileSize = _byteBudget < availableBytes;
     _isRecording = true;
     _finished = Completer<RecordingResult?>();
+    _onStopped = onStopped;
 
     // Keep running while backgrounded / screen-locked.
     await _session.start(notification);
 
-    _subscription = stream.listen(
-      (chunk) => _onChunk(chunk, onStopped),
-      onError: (Object e, StackTrace _) {
-        debugPrint('AudioRecordingService: stream error: $e');
-        _finish(RecordingStopReason.interrupted, onStopped);
-      },
-      onDone: () {
-        // The platform ended the stream without us asking (e.g. an audio
-        // interruption we could not recover from). Keep what we have.
-        if (_isRecording) {
-          _finish(RecordingStopReason.interrupted, onStopped);
-        }
-      },
-      cancelOnError: true,
-    );
+    _captureRestarts = 0;
+    _restartAttemptsUsed = 0;
+    _awaitingFirstChunk = false;
+    // The clock starts now, not at the first buffer: a microphone that never
+    // produces one is exactly the failure the watchdog exists to catch.
+    _lastChunkAt = DateTime.now();
+    _listen(stream);
 
     // Periodic flush is the crash-safety guarantee: at most one interval of
     // audio can be lost.
     _flushTimer = Timer.periodic(flushInterval, (_) => _flush());
+    _watchdog = Timer.periodic(_watchdogInterval, (_) => _checkForStall());
 
     return '$basePath.wav';
   }
 
-  void _onChunk(
-    Uint8List chunk,
-    void Function(RecordingResult result)? onStopped,
-  ) {
+  /// Notice capture going quiet, and rebuild it.
+  ///
+  /// The recovery path already existed and was sound; what was missing was
+  /// anything able to *trigger* it when the platform neither errors nor closes
+  /// the stream. That is the common case — another app takes the microphone, or
+  /// the OS freezes this process in the background — and it left a recording
+  /// frozen at whatever second it stalled on, looking live, until the user
+  /// pressed stop.
+  void _checkForStall() {
+    if (!_isRecording || _restarting) return;
+    final last = _lastChunkAt;
+    if (last == null) return;
+    if (DateTime.now().difference(last) < _stallTimeout) return;
+
+    debugPrint('AudioRecordingService: no audio for '
+        '${DateTime.now().difference(last).inMilliseconds}ms — rebuilding capture');
+    unawaited(_restartCapture());
+  }
+
+  /// Subscribe to a capture stream. Called again for each rebuilt stream.
+  ///
+  /// These two callbacks are the *polite* ways capture can fail. Neither fires
+  /// when the platform simply stops delivering, which is why [_checkForStall]
+  /// exists alongside them.
+  void _listen(Stream<Uint8List> stream) {
+    _subscription = stream.listen(
+      _onChunk,
+      onError: (Object e, StackTrace _) {
+        debugPrint('AudioRecordingService: stream error: $e');
+        unawaited(_restartCapture());
+      },
+      onDone: () {
+        // The platform ended the stream without being asked — a phone call the
+        // session could not recover from, a Bluetooth headset disconnecting,
+        // another app taking the microphone. The recording is not over; only
+        // this stream is.
+        if (_isRecording) unawaited(_restartCapture());
+      },
+      cancelOnError: true,
+    );
+  }
+
+  /// Rebuild capture after it drops out, and keep writing to the same file.
+  ///
+  /// A recording ends when the user says so. Anything else that stops the
+  /// microphone is treated as a fault to recover from: the stream is torn down
+  /// and reopened, with a backoff so a device that needs a moment gets one. The
+  /// audio already on disk is untouched throughout, and the gap is simply
+  /// missing from the file — which is the honest outcome, since nothing was
+  /// captured during it.
+  ///
+  /// Only after [_maxCaptureRestarts] failed attempts does the recording end,
+  /// keeping everything recorded up to that point.
+  Future<void> _restartCapture() async {
+    if (!_isRecording || _restarting) return;
+    _restarting = true;
+    onCaptureInterrupted?.call(true);
+
+    try {
+      while (_restartAttemptsUsed < _maxCaptureRestarts) {
+        final attempt = _restartAttemptsUsed++;
+        await Future<void>.delayed(_backoffFor(attempt));
+        // The user may have tapped stop while this was waiting.
+        if (!_isRecording) return;
+
+        await _subscription?.cancel();
+        _subscription = null;
+        try {
+          await _capture.stop();
+        } catch (_) {
+          // Already stopped, or never started. Either way the next call is the
+          // one that matters.
+        }
+
+        try {
+          final stream = await _capture.start(_captureConfig);
+          if (!_isRecording) {
+            await _capture.stop();
+            return;
+          }
+          _captureRestarts++;
+          // Nothing is buffered after the gap, so let audio through until the
+          // detector has had a chance to catch up.
+          _gate?.openForResume();
+
+          // A rebuilt stream is a claim, not a recovery. `startStream` can
+          // succeed and hand back a stream that never emits — which is exactly
+          // what happens when the microphone is still held by whoever took it.
+          // So the "recording again" message and the retry budget both wait for
+          // real audio; until then the watchdog's clock is running and will
+          // come back round to try again.
+          _awaitingFirstChunk = true;
+          _lastChunkAt = DateTime.now();
+          _listen(stream);
+          debugPrint('AudioRecordingService: capture rebuilt on attempt '
+              '${attempt + 1}; waiting for audio');
+          return;
+        } catch (e) {
+          debugPrint('AudioRecordingService: restart attempt ${attempt + 1} '
+              'failed: $e');
+        }
+      }
+
+      debugPrint('AudioRecordingService: giving up after $_maxCaptureRestarts '
+          'restart attempts; keeping the audio recorded so far');
+      await _finish(RecordingStopReason.interrupted, _onStopped);
+    } finally {
+      _restarting = false;
+    }
+  }
+
+  /// Doubling backoff, capped: a transient glitch recovers on the first retry,
+  /// while a microphone held by another app is not polled sixty times a second.
+  static Duration _backoffFor(int attempt) {
+    final ms = 200 * (1 << attempt.clamp(0, 4));
+    return ms >= _maxRestartBackoff.inMilliseconds
+        ? _maxRestartBackoff
+        : Duration(milliseconds: ms);
+  }
+
+  void _onChunk(Uint8List chunk) {
     if (!_isRecording) return;
+
+    // Proof of life for the watchdog, stamped before every early return below.
+    // A paused recording and a silent room both stop bytes being written while
+    // capture is perfectly healthy; only the arrival of a buffer says the
+    // microphone is still there.
+    _lastChunkAt = DateTime.now();
+
+    // Audio is back after an interruption. This — not `startStream` returning —
+    // is what makes a recovery real, so it is what clears the warning and
+    // replenishes the retry budget for any future, unrelated interruption.
+    if (_awaitingFirstChunk) {
+      _awaitingFirstChunk = false;
+      _restartAttemptsUsed = 0;
+      debugPrint('AudioRecordingService: capture resumed');
+      onCaptureInterrupted?.call(false);
+    }
+
     // While paused the microphone stream is left running and its audio is
     // dropped. Stopping the platform recorder instead would end the stream and
     // tear down the session, which on iOS also drops the background audio
@@ -212,18 +559,42 @@ class AudioRecordingService {
     // locked, and could not resume.
     if (_isPaused) return;
 
+    // Silence is dropped before anything else sees this audio, so the byte
+    // budget, the elapsed time and the live transcript's byte offsets all go on
+    // describing the file that is actually being written.
+    final gate = _gate;
+    final Uint8List audio;
+    if (gate == null) {
+      audio = chunk;
+    } else {
+      audio = gate.gate(chunk);
+      if (audio.isEmpty) return;
+    }
+
     final remaining = _byteBudget - _bytesWritten;
     if (remaining <= 0) {
-      _finish(RecordingStopReason.storageFull, onStopped);
+      _finish(_budgetExhaustedReason, _onStopped);
       return;
     }
 
     // Trim the final chunk so the cap is honoured exactly rather than
     // overshooting by up to one buffer.
     final toWrite =
-        chunk.length <= remaining ? chunk : Uint8List.sublistView(chunk, 0, remaining);
+        audio.length <= remaining ? audio : Uint8List.sublistView(audio, 0, remaining);
     final offsetBefore = _bytesWritten;
-    _sink?.add(toWrite);
+
+    // Guarded because this runs inside a stream callback: an exception here
+    // escapes to the zone, where release builds swallow it, and every later
+    // chunk then throws at the same line. The visible result is identical to a
+    // dead microphone — a frozen timer over a recording that still looks live —
+    // so a failed write has to end the recording out loud instead.
+    try {
+      _sink?.add(toWrite);
+    } catch (e) {
+      debugPrint('AudioRecordingService: write failed: $e');
+      _finish(RecordingStopReason.writeFailed, _onStopped);
+      return;
+    }
     _bytesWritten += toWrite.length;
     _session.updateElapsed(elapsed);
 
@@ -241,9 +612,14 @@ class AudioRecordingService {
     }
 
     if (_bytesWritten >= _byteBudget) {
-      _finish(RecordingStopReason.storageFull, onStopped);
+      _finish(_budgetExhaustedReason, _onStopped);
     }
   }
+
+  /// Why the recording ends when the byte budget runs out.
+  RecordingStopReason get _budgetExhaustedReason => _cappedByFileSize
+      ? RecordingStopReason.fileSizeLimit
+      : RecordingStopReason.storageFull;
 
   Future<void> _flush() async {
     try {
@@ -258,6 +634,9 @@ class AudioRecordingService {
   void pause() {
     if (!_isRecording || _isPaused) return;
     _isPaused = true;
+    // Audio buffered by the gate belongs to the moment before the pause;
+    // resuming must not splice it in front of what comes next.
+    _gate?.reset();
     // Flush now so a crash while paused keeps everything up to this point.
     _flush();
   }
@@ -265,6 +644,9 @@ class AudioRecordingService {
   void resume() {
     if (!_isRecording || !_isPaused) return;
     _isPaused = false;
+    // Nothing is buffered after a pause, so a user who speaks the instant they
+    // resume would lose the moment the detector takes to decide. Start open.
+    _gate?.openForResume();
   }
 
   /// Stop recording at the user's request and finalise the WAV.
@@ -276,7 +658,8 @@ class AudioRecordingService {
   /// Shared teardown for every way a recording can end.
   Future<RecordingResult?> _finish(
     RecordingStopReason reason,
-    void Function(RecordingResult result)? onStopped,
+    void Function(RecordingStopReason reason, RecordingResult? result)?
+        onStopped,
   ) async {
     if (!_isRecording) return _finished?.future;
     _isRecording = false;
@@ -284,11 +667,19 @@ class AudioRecordingService {
     _flushTimer?.cancel();
     _flushTimer = null;
 
+    // Before anything awaits: the watchdog must not fire against a recording
+    // that is already ending and try to rebuild capture underneath the
+    // teardown.
+    _watchdog?.cancel();
+    _watchdog = null;
+    _lastChunkAt = null;
+    _awaitingFirstChunk = false;
+
     await _subscription?.cancel();
     _subscription = null;
 
     try {
-      await _recorder.stop();
+      await _capture.stop();
     } catch (e) {
       debugPrint('AudioRecordingService: recorder.stop failed: $e');
     }
@@ -317,10 +708,18 @@ class AudioRecordingService {
 
     _bytesWritten = 0;
     _isPaused = false;
+    _cappedByFileSize = false;
+    _restartAttemptsUsed = 0;
+    _onStopped = null;
     _finished?.complete(result);
 
-    if (result != null && reason != RecordingStopReason.user) {
-      onStopped?.call(result);
+    // Deliberately not conditional on `result`: a recording that ends by itself
+    // having captured nothing — the microphone revoked a moment after it
+    // started, say — still has to take the UI out of its recording state.
+    // Gating this on a non-null result left the timer running over a recording
+    // that had already stopped.
+    if (reason != RecordingStopReason.user) {
+      onStopped?.call(reason, result);
     }
     return result;
   }
@@ -332,10 +731,22 @@ class AudioRecordingService {
   static Future<String?> finalisePcm(File pcmFile) async {
     if (!await pcmFile.exists()) return null;
 
-    final dataBytes = await pcmFile.length();
-    if (dataBytes <= 0) {
+    final rawBytes = await pcmFile.length();
+    if (rawBytes <= 0) {
       await pcmFile.delete();
       return null;
+    }
+
+    // Recording clamps its own budget, but recovery has to cope with whatever
+    // is on disk — including a `.pcm` written by an older build that had no
+    // clamp. Describing more bytes than a 32-bit RIFF size can hold would
+    // produce an unreadable file, so the tail is dropped instead: a valid
+    // 37-hour recording beats a corrupt longer one.
+    final dataBytes = math.min(rawBytes, maxWavDataBytes);
+    if (dataBytes < rawBytes) {
+      debugPrint('AudioRecordingService: ${p.basename(pcmFile.path)} is '
+          '$rawBytes bytes; '
+          'truncating to the $maxWavDataBytes-byte WAV limit');
     }
 
     final wavPath = p.setExtension(pcmFile.path, '.wav');
@@ -347,7 +758,7 @@ class AudioRecordingService {
         sampleRate: sampleRate,
         channels: channels,
       ));
-      await sink.addStream(pcmFile.openRead());
+      await sink.addStream(pcmFile.openRead(0, dataBytes));
       await sink.flush();
     } finally {
       await sink.close();
@@ -377,7 +788,7 @@ class AudioRecordingService {
         final wavPath = await finalisePcm(entry);
         if (wavPath != null) recovered.add(wavPath);
       } catch (e) {
-        debugPrint('Could not recover ${entry.path}: $e');
+        debugPrint('Could not recover ${p.basename(entry.path)}: $e');
       }
     }
 
@@ -401,9 +812,13 @@ class AudioRecordingService {
 
   void dispose() {
     _flushTimer?.cancel();
+    _watchdog?.cancel();
+    _watchdog = null;
     _subscription?.cancel();
     _sink?.close();
-    _recorder.dispose();
+    _gate?.dispose();
+    _gate = null;
+    _capture.dispose();
   }
 
   /// `yyyyMMdd_HHmmss`, matching the fixed 24-hour timestamp the UI displays.

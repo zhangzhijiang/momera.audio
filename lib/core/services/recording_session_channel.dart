@@ -53,6 +53,11 @@ class RecordingSessionChannel {
       defaultTargetPlatform == TargetPlatform.iOS;
 
   Future<void> start(RecordingNotificationText? notification) async {
+    // Reset the throttle here as well as in [stop]. A recording that ended
+    // abnormally — the service killed, the process torn down mid-session —
+    // leaves the last published second behind, and the next recording's first
+    // update would be discarded as a duplicate of it.
+    _lastPublishedSecond = -1;
     if (!_isSupported) return;
     try {
       await _channel.invokeMethod<void>('start', notification?.toMap() ?? {});

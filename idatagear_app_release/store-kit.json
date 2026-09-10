@@ -1,0 +1,90 @@
+{
+  "_comment": [
+    "store-kit config for Momera Recorder. Toolkit lives at",
+    "~/Developer/projects/google_play_store_helper; see its README.md.",
+    "candidateCount is deliberately absent: the default is 50 per tier, which",
+    "is the target integration_test/store_screenshots.dart is written against."
+  ],
+  "package": "com.idatagear.momerarecording",
+  "appName": "Momera Recorder",
+
+  "_iconMaster": [
+    "The square logo with its near-white ground — the same file",
+    "flutter_launcher_icons reads, so the Play icon and the launcher icon are",
+    "the same artwork. mark_color_1024.png is the same mark with the ground",
+    "knocked out to alpha; it is the adaptive foreground, not the store icon."
+  ],
+  "iconMaster": "assets/icon/momera_recording_logo.png",
+  "adaptiveForeground": "assets/icon/mark_color_1024.png",
+
+  "arbDir": "lib/l10n",
+
+  "_locales": [
+    "auto -> lib/l10n/app_{en,ja,ko,zh,zh_Hant}.arb, all five 100% translated.",
+    "en leads, so en-US is the default Play listing and every other Play",
+    "language falls back to it. zh -> zh-CN and zh_Hant -> zh-TW come from the",
+    "toolkit's built-in table and are correct here."
+  ],
+  "locales": "auto",
+  "localeExclude": [],
+  "listingLocaleMap": {},
+
+  "tiers": ["phone", "tablet_7", "tablet_10"],
+
+  "capture": {
+    "engine": "integration_test",
+    "target": "integration_test/store_screenshots.dart",
+    "_dwellMs": [
+      "2000 rather than the 1500 default: several screens here settle into a",
+      "waveform or a fading notice, and a short dwell caught them mid-animation."
+    ],
+    "dwellMs": 2000
+  },
+
+  "featureGraphic": {
+    "_gradient": [
+      "Explicit, not auto. The icon master is a mark on a near-white ground, so",
+      "an auto gradient sampled from its corners comes out white-on-white. These",
+      "are AppTheme.light.accent (#8B5CF6) and a deeper violet of the same hue."
+    ],
+    "gradient": ["#8B5CF6", "#5B21B6"],
+    "chips": [],
+    "languageLine": "English · 中文 · 日本語 · 한국어",
+    "tagline": {
+      "en-US": "Record. Transcribe. Offline.",
+      "ja": "録音して、文字起こし。すべてオフラインで。",
+      "ko": "녹음하고 받아쓰기. 모두 오프라인으로.",
+      "zh-CN": "录音、转文字，全程离线。",
+      "zh-TW": "錄音、轉文字，全程離線。"
+    }
+  },
+
+  "_appstore": [
+    "Present because this repo already ships an iOS target with the SAME bundle",
+    "id as the Android package (see idatagear_app_release/apple/release_guide.md).",
+    "Nothing here changes what the Play flow produces — it is read only by",
+    "`shoot --platform ios` / `generate --store appstore`, which the",
+    "apple-store-assets command drives. The app has no ads and no consent flow,",
+    "so dartDefines carries only the microphone gate."
+  ],
+  "appstore": {
+    "bundleId": "com.idatagear.momerarecording",
+    "tiers": ["iphone"],
+    "devices": {
+      "iphone": "iPhone 17 Pro Max"
+    },
+    "dartDefines": {
+      "STOREKIT_DISABLE_ADS": "true"
+    },
+    "listingLocaleMap": {},
+    "localeExclude": []
+  },
+
+  "_contentScan": [
+    "Nothing to scan: this app has no bundled JSON content and no randomised",
+    "user-visible strings. Every screen's text is either from lib/l10n/*.arb or",
+    "from the recordings seeded by integration_test/store_screenshots.dart,",
+    "which are fixed literals in that file."
+  ],
+  "contentScan": []
+}

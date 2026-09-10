@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import '../capabilities/device_info_channel.dart';
+
 /// Downloads the large SenseVoice STT model at runtime instead of bundling it
 /// inside the app package.
 ///
@@ -38,6 +40,14 @@ class ModelDownloadService {
   static const int expectedBytes = 239233841;
 
   static const String _fileName = 'model.int8.onnx';
+
+  /// Slack on top of the model itself, for the filesystem and the tokens file.
+  /// The `.part` is renamed into place on the same volume, so the download
+  /// never needs two copies of the model at once.
+  static const int downloadHeadroomBytes = 64 * 1024 * 1024;
+
+  /// Free space a fresh download needs.
+  static int get requiredFreeBytes => expectedBytes + downloadHeadroomBytes;
 
   /// Root directory for all downloaded/derived model files.
   ///
@@ -76,6 +86,18 @@ class ModelDownloadService {
     await file.parent.create(recursive: true);
     await _excludeFromBackup(file.parent);
 
+    // Checked once, before the source loop: inside it, the `catch` below would
+    // dutifully try the second URL, fail identically, and burn a DNS lookup and
+    // a connection first. Only what is still missing has to fit — a user who is
+    // 90% downloaded should not be told to free another 228 MB.
+    final resumable = await _partLength(file);
+    final needed =
+        (expectedBytes - resumable).clamp(0, expectedBytes) + downloadHeadroomBytes;
+    final free = await DeviceInfoChannel.freeDiskBytes();
+    if (free >= 0 && free < needed) {
+      throw InsufficientStorageException(needed, free);
+    }
+
     Object? lastError;
     for (final url in modelUrls) {
       try {
@@ -86,6 +108,18 @@ class ModelDownloadService {
       }
     }
     throw lastError ?? StateError('No model download sources configured.');
+  }
+
+  /// Bytes of a resumable partial download, or 0 if there is none.
+  static Future<int> _partLength(File file) async {
+    try {
+      final part = File('${file.path}.part');
+      if (!await part.exists()) return 0;
+      final length = await part.length();
+      return (length > 0 && length < expectedBytes) ? length : 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// Download (or resume) the model from a single [url] into [file].
@@ -155,7 +189,6 @@ class ModelDownloadService {
       if (await file.exists()) await file.delete();
       await partFile.rename(file.path);
       onProgress?.call(1.0);
-      debugPrint('Model downloaded successfully: ${file.path}');
       return file;
     } finally {
       client.close();
@@ -191,4 +224,24 @@ class ModelDownloadService {
     if (await file.exists()) await file.delete();
     if (await partFile.exists()) await partFile.delete();
   }
+}
+
+/// Thrown when there is not enough free space to download the speech model.
+///
+/// A **temporary** condition, deliberately distinct from any device limit: the
+/// user can free space and retry, so callers must keep the feature visible and
+/// say what is needed rather than hiding it.
+class InsufficientStorageException implements Exception {
+  const InsufficientStorageException(this.neededBytes, this.availableBytes);
+
+  /// Free space the download requires.
+  final int neededBytes;
+
+  /// Free space there actually is.
+  final int availableBytes;
+
+  @override
+  String toString() =>
+      'Not enough space for the speech model: needs $neededBytes bytes, '
+      '$availableBytes available.';
 }

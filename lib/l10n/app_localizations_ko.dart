@@ -70,6 +70,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsLanguageSubtitle => '앱 전체에서 사용하는 언어';
 
   @override
+  String get settingsInfo => '이 설정 정보';
+
+  @override
   String get languageSystem => '시스템 기본값';
 
   @override
@@ -82,22 +85,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get languageChineseTraditional => '繁體中文';
 
   @override
-  String get settingsStorage => '저장 공간';
-
-  @override
   String get settingsMaxStorage => '최대 저장 공간';
 
   @override
   String get settingsMaxStorageSubtitle =>
-      '녹음 전체 크기가 이 한도에 도달하면 녹음이 자동으로 중지됩니다.';
+      '녹음 용량이 이 크기에 이르면 녹음이 중지됩니다. 표시된 시간은 오디오 길이이며, 무음 건너뛰기를 켜면 실제 녹음 시간은 더 길어질 수 있습니다.';
 
   @override
   String settingsStorageUsed(String used, String total) {
     return '$total 중 $used 사용 중';
   }
-
-  @override
-  String get settingsRecording => '녹음';
 
   @override
   String get settingsAutosaveInterval => '자동 저장 간격';
@@ -120,6 +117,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String storageFullBody(String limit) {
     return '녹음 전체 크기가 한도($limit)에 도달하여 녹음을 중지했습니다. 녹음을 삭제하거나 설정에서 한도를 늘리세요.';
   }
+
+  @override
+  String get fileSizeLimitBody =>
+      '이 녹음이 오디오 파일 하나에 담을 수 있는 최대 길이에 도달하여 녹음을 중지했습니다. 녹음은 저장되었으며, 계속하려면 새 녹음을 시작하세요.';
 
   @override
   String get recoveredRecordingBody => '중단된 녹음을 복구했습니다.';
@@ -146,16 +147,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get playbackFailed => '이 녹음을 재생할 수 없습니다.';
-
-  @override
-  String get settingsTranscription => '텍스트 변환';
-
-  @override
-  String get settingsTranscriptionLanguage => '말하는 언어';
-
-  @override
-  String get settingsTranscriptionLanguageSubtitle =>
-      '자동 감지는 구절마다 언어를 판별하므로 대화 중 언어가 바뀌어도 정확하게 변환됩니다. 오디오가 항상 한 언어라면 직접 지정하세요.';
 
   @override
   String get sttAuto => '자동 감지';
@@ -202,6 +193,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get save => '저장';
 
   @override
+  String get transcriptLabel => '변환된 텍스트';
+
+  @override
   String get copyTranscript => '변환된 텍스트 복사';
 
   @override
@@ -246,65 +240,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchNoResultsHint => '말한 내용으로 검색하려면 먼저 텍스트로 변환해야 합니다.';
 
   @override
-  String searchResultCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '결과 $count개',
-    );
-    return '$_temp0';
-  }
+  String get searchHintNamesOnly => '녹음 검색';
+
+  @override
+  String get searchNoResultsHintNamesOnly => '검색은 녹음 이름과 일치합니다.';
+
+  @override
+  String get transcriptionLoadFailed => '이 기기에서는 음성 모델을 불러올 수 없습니다.';
 
   @override
   String get searchMatchedName => '이름 일치';
 
   @override
   String get clear => '지우기';
-
-  @override
-  String get translate => '번역';
-
-  @override
-  String get translateTo => '번역할 언어';
-
-  @override
-  String get translating => '번역 중…';
-
-  @override
-  String get translationFailed => '번역에 실패했습니다.';
-
-  @override
-  String get translationUnsupported => '이 기기에서는 해당 언어 조합을 번역할 수 없습니다.';
-
-  @override
-  String get translationCantonese => '광둥어 번역에는 온라인 번역기가 필요하지만 아직 제공되지 않습니다.';
-
-  @override
-  String translationOf(String language) {
-    return '번역 ($language)';
-  }
-
-  @override
-  String get translationSourceUnknown =>
-      '번역하려면 감지된 언어가 하나여야 합니다. 이 녹음은 언어가 없거나 여러 개입니다.';
-
-  @override
-  String get langEnglish => '영어';
-
-  @override
-  String get langChineseSimplified => '중국어(간체)';
-
-  @override
-  String get langChineseTraditional => '중국어(번체)';
-
-  @override
-  String get langJapanese => '일본어';
-
-  @override
-  String get langKorean => '한국어';
-
-  @override
-  String get langCantonese => '광둥어';
 
   @override
   String get liveHold => '길게 눌러 실시간 표시';
@@ -325,5 +273,144 @@ class AppLocalizationsKo extends AppLocalizations {
   String get liveBusy => '진행 중인 텍스트 변환을 먼저 끝내세요.';
 
   @override
-  String get liveTranslateOff => '번역 안 함';
+  String notEnoughSpaceBody(String needed, String available) {
+    return '음성 모델을 다운로드하려면 $needed를 확보해야 합니다. 현재 $available 사용 가능합니다.';
+  }
+
+  @override
+  String get waveformSeek => '이 녹음에서 이동';
+
+  @override
+  String get removeTranscript => '텍스트 삭제';
+
+  @override
+  String get removeTranscriptTitle => '이 텍스트를 삭제할까요?';
+
+  @override
+  String get removeTranscriptBody =>
+      '텍스트가 삭제됩니다. 이 녹음은 언제든 다시 텍스트로 변환할 수 있습니다.';
+
+  @override
+  String get transcriptRemoved => '텍스트를 삭제했습니다.';
+
+  @override
+  String get livePanelHidden => '실시간 텍스트를 숨겼습니다. 자막 버튼을 길게 눌러 다시 표시하세요.';
+
+  @override
+  String get today => '오늘';
+
+  @override
+  String get yesterday => '어제';
+
+  @override
+  String get history => '기록';
+
+  @override
+  String get settingsHistorySubtitle =>
+      '지금까지 녹음한 모든 파일이 최신순으로 표시됩니다. 홈 화면에는 오늘 녹음만 남고 나머지는 여기에 있습니다.';
+
+  @override
+  String historyCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '녹음 $count개',
+      zero: '녹음 없음',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get noRecordingsTodayTitle => '오늘 녹음한 파일이 없습니다';
+
+  @override
+  String get noRecordingsTodayBody => '녹음 버튼을 눌러 시작하세요. 이전 녹음은 기록에 있습니다.';
+
+  @override
+  String get openHistory => '기록 열기';
+
+  @override
+  String get searchNoResultsHintToday =>
+      '여기서는 오늘 녹음만 검색합니다. 전체를 검색하려면 기록을 사용하세요.';
+
+  @override
+  String get playbackBlockedWhileRecording => '녹음을 중지한 후 다른 녹음을 재생하세요.';
+
+  @override
+  String get hideLiveText => '실시간 텍스트 숨기기';
+
+  @override
+  String get skipSilence => '무음 건너뛰기';
+
+  @override
+  String get skipSilenceOnTitle => '무음을 건너뜁니다';
+
+  @override
+  String get skipSilenceOnBody => '음성만 녹음합니다.';
+
+  @override
+  String get skipSilenceOffTitle => '전체 녹음';
+
+  @override
+  String get skipSilenceOffBody => '무음도 함께 녹음합니다.';
+
+  @override
+  String get skipSilenceUnavailable => '이 기기에서는 무음 건너뛰기를 사용할 수 없습니다.';
+
+  @override
+  String get settingsTheme => '테마';
+
+  @override
+  String get settingsThemeSubtitle =>
+      '밝게 또는 어둡게. 기본값은 기기 설정을 따르며, 직접 고를 수도 있습니다. 어두운 방에서 밝게 설정된 기기로 녹음할 때 유용합니다.';
+
+  @override
+  String get themeSystem => '기기 설정 따르기';
+
+  @override
+  String get themeLight => '밝게';
+
+  @override
+  String get themeDark => '어둡게';
+
+  @override
+  String get noRecordingsOnDay => '이 날짜에는 녹음이 없습니다.';
+
+  @override
+  String get noRecordingsOnDayHint => '강조된 날짜를 다시 누르면 전체 기록이 표시됩니다.';
+
+  @override
+  String get recordingReconnecting => '마이크 연결이 끊겼습니다. 다시 연결하는 중…';
+
+  @override
+  String get recordingResumed => '다시 녹음합니다.';
+
+  @override
+  String get recordingInterruptedBody =>
+      '녹음을 중지했습니다. 마이크를 계속 사용할 수 없었습니다. 그때까지 녹음한 내용은 모두 저장되었습니다.';
+
+  @override
+  String get recordingWriteFailedBody =>
+      '녹음이 중지되었습니다: 오디오를 이 기기에 저장할 수 없습니다. 그때까지 녹음된 내용은 저장되었습니다.';
+
+  @override
+  String durationHoursMinutes(int hours, int minutes) {
+    return '$hours시간 $minutes분';
+  }
+
+  @override
+  String durationMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count분',
+      zero: '1분 미만',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsStorageDurations(String recorded, String remaining) {
+    return '$recorded 녹음함 · 약 $remaining 더 녹음 가능';
+  }
 }

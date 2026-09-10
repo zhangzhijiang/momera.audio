@@ -5,19 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/live_transcription_service.dart';
 import '../../core/services/transcription_service.dart';
-import '../../core/translation/translator.dart';
 import 'service_providers.dart';
 
-/// One line of the live panel: what was heard, and optionally its translation.
+/// One line of the live panel: what was heard.
 @immutable
 class LiveLine {
-  const LiveLine({required this.segment, this.translation});
+  const LiveLine({required this.segment});
 
   final TranscriptSegment segment;
-  final String? translation;
-
-  LiveLine withTranslation(String value) =>
-      LiveLine(segment: segment, translation: value);
 }
 
 /// Rolling live-transcript state.
@@ -27,8 +22,7 @@ class LiveTranscriptState {
     this.lines = const [],
     this.active = false,
     this.starting = false,
-    this.translateTo,
-    this.error,
+    this.dismissed = false,
   });
 
   /// Most recent first — the panel shows the newest line at the top so it does
@@ -41,10 +35,9 @@ class LiveTranscriptState {
   /// True between the press and the recogniser being ready.
   final bool starting;
 
-  /// Target language for live translation, or null when it is off.
-  final TranslationLanguage? translateTo;
-
-  final String? error;
+  /// The user closed the panel. Purely presentational — the live pass is
+  /// bounded by the held button, not by whether the panel is on screen.
+  final bool dismissed;
 
   bool get isEmpty => lines.isEmpty;
 
@@ -52,17 +45,13 @@ class LiveTranscriptState {
     List<LiveLine>? lines,
     bool? active,
     bool? starting,
-    TranslationLanguage? translateTo,
-    bool clearTranslateTo = false,
-    String? error,
-    bool clearError = false,
+    bool? dismissed,
   }) {
     return LiveTranscriptState(
       lines: lines ?? this.lines,
       active: active ?? this.active,
       starting: starting ?? this.starting,
-      translateTo: clearTranslateTo ? null : (translateTo ?? this.translateTo),
-      error: clearError ? null : (error ?? this.error),
+      dismissed: dismissed ?? this.dismissed,
     );
   }
 }
@@ -78,7 +67,13 @@ class LiveTranscriptNotifier extends Notifier<LiveTranscriptState> {
   static const int _maxLines = 40;
 
   LiveTranscriptionService? _live;
-  Translator? _translator;
+
+  /// Bumped every time the panel is cleared.
+  ///
+  /// Decodes are asynchronous now, so an utterance submitted before a [reset]
+  /// can land after it. Without this guard the panel would repopulate itself
+  /// with the previous recording's last phrase.
+  int _generation = 0;
 
   @override
   LiveTranscriptState build() {
@@ -88,14 +83,20 @@ class LiveTranscriptNotifier extends Notifier<LiveTranscriptState> {
 
   /// Begin a live pass. Returns false when it could not start — usually because
   /// the model is not downloaded, or a file transcription holds the recogniser.
-  Future<bool> start({required int fromByteOffset}) async {
+  Future<bool> start({
+    required int fromByteOffset,
+    TranscriptionLanguage language = TranscriptionLanguage.auto,
+  }) async {
     if (state.active || state.starting) return true;
-    state = state.copyWith(starting: true, clearError: true);
+    state = state.copyWith(starting: true);
 
     final service = _live ??=
         LiveTranscriptionService(ref.read(transcriptionServiceProvider));
 
-    final ok = await service.start(fromByteOffset: fromByteOffset);
+    final ok = await service.start(
+      fromByteOffset: fromByteOffset,
+      language: language,
+    );
     if (!ok) {
       state = state.copyWith(starting: false);
       return false;
@@ -106,49 +107,57 @@ class LiveTranscriptNotifier extends Notifier<LiveTranscriptState> {
   }
 
   /// Feed recorded audio. Safe to call when inactive — it does nothing.
+  ///
+  /// Deliberately returns void and does not await the decode: this runs inside
+  /// the recorder's audio-chunk handler, so it has to hand control straight
+  /// back. Lines appear when the worker isolate answers.
   void feed(Uint8List pcm) {
     final service = _live;
     if (service == null || !state.active) return;
-
-    final segments = service.feed(pcm);
-    if (segments.isNotEmpty) _appendAll(segments);
+    unawaited(_collect(service.feed(pcm)));
   }
 
   /// End the live pass, keeping whatever text was produced on screen.
   void stop() {
     final service = _live;
     if (service == null) return;
-    final trailing = service.stop();
-    if (trailing.isNotEmpty) _appendAll(trailing);
     state = state.copyWith(active: false, starting: false);
+    // Trailing speech still has to be decoded; the panel fills in when it lands.
+    unawaited(_collect(service.stop()));
   }
+
+  /// Hide the panel without touching the transcript or the live pass.
+  ///
+  /// This is the verb the API was missing. [reset] over-clears — it wipes the
+  /// panel's lines. [stop] under-clears — it kills a pass the held finger
+  /// already bounds. Closing a panel is neither.
+  void dismissPanel() => state = state.copyWith(dismissed: true);
+
+  /// Bring the panel back.
+  void showPanel() => state = state.copyWith(dismissed: false);
 
   /// Clear the panel, e.g. when a new recording starts.
   void reset() {
-    stop();
+    _generation++;
+    // Drain the pass and discard whatever comes back: any trailing utterance
+    // belongs to the recording that just ended, not the one starting now.
+    unawaited(_live?.stop().catchError((_) => const <TranscriptSegment>[]));
+    // A fresh const state also clears `dismissed`, so a panel closed during one
+    // recording comes back for the next without a separate un-set.
     state = const LiveTranscriptState();
   }
 
-  /// Turn live translation on (or off, with null) for the given target.
-  ///
-  /// The engine is resolved once here rather than per utterance: resolving it
-  /// costs two or three platform round trips, which is wasteful once a phrase.
-  Future<void> setTranslationTarget(TranslationLanguage? target) async {
-    if (target == null) {
-      _translator = null;
-      state = state.copyWith(clearTranslateTo: true);
-      return;
+  /// Append segments once they finish decoding, unless the panel was cleared
+  /// while they were in flight.
+  Future<void> _collect(Future<List<TranscriptSegment>> pending) async {
+    final generation = _generation;
+    try {
+      final segments = await pending;
+      if (segments.isEmpty || generation != _generation) return;
+      _appendAll(segments);
+    } catch (e) {
+      debugPrint('Live transcription: dropped a phrase: $e');
     }
-
-    // ML Kit is preferred over Apple for live use even on iOS 18+: it caches
-    // one native translator per language pair and reuses it, whereas the Apple
-    // bridge mounts a fresh SwiftUI host and TranslationSession per call, which
-    // would mean view-hierarchy churn on the main thread once per utterance.
-    final engine = await ref
-        .read(translationServiceProvider)
-        .engineFor(target, preferReusable: true);
-    _translator = engine;
-    state = state.copyWith(translateTo: target, clearError: engine != null);
   }
 
   void _appendAll(List<TranscriptSegment> segments) {
@@ -159,61 +168,8 @@ class LiveTranscriptNotifier extends Notifier<LiveTranscriptState> {
     state = state.copyWith(
       lines: next.length > _maxLines ? next.sublist(0, _maxLines) : next,
     );
-    final target = state.translateTo;
-    if (target != null) {
-      for (final segment in segments) {
-        unawaited(_translateLine(segment, target));
-      }
-    }
   }
 
-  /// Translate one utterance, using **that utterance's** detected language.
-  ///
-  /// Deliberately not `TranslationService.sourceFor`, which returns null as
-  /// soon as a recording contains more than one language. Per segment the
-  /// language is always singular, so live translation copes with a
-  /// conversation that switches language — something the batch path refuses.
-  Future<void> _translateLine(
-    TranscriptSegment segment,
-    TranslationLanguage target,
-  ) async {
-    final translator = _translator;
-    final source = _sourceFor(segment.language);
-    if (translator == null || source == null || source == target) return;
-    // No on-device engine translates Cantonese; skip rather than route it
-    // through Chinese and produce plausible but wrong text.
-    if (source == TranslationLanguage.cantonese) return;
-
-    try {
-      final text =
-          await translator.translate(segment.text, from: source, to: target);
-      final updated = [
-        for (final line in state.lines)
-          identical(line.segment, segment) ? line.withTranslation(text) : line,
-      ];
-      state = state.copyWith(lines: updated);
-    } catch (e) {
-      debugPrint('Live translation failed: $e');
-    }
-  }
-
-  static TranslationLanguage? _sourceFor(TranscriptionLanguage? detected) {
-    switch (detected) {
-      case TranscriptionLanguage.mandarin:
-        return TranslationLanguage.chineseSimplified;
-      case TranscriptionLanguage.cantonese:
-        return TranslationLanguage.cantonese;
-      case TranscriptionLanguage.english:
-        return TranslationLanguage.english;
-      case TranscriptionLanguage.japanese:
-        return TranslationLanguage.japanese;
-      case TranscriptionLanguage.korean:
-        return TranslationLanguage.korean;
-      case TranscriptionLanguage.auto:
-      case null:
-        return null;
-    }
-  }
 }
 
 final liveTranscriptProvider =

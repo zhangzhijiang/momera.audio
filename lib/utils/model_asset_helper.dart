@@ -19,15 +19,32 @@ class ModelAssetHelper {
   /// Whether the downloaded STT model is present and valid.
   static Future<bool> isModelReady() => ModelDownloadService.isModelReady();
 
+  /// Copy out the bundled VAD model and return its path.
+  ///
+  /// Unlike [resolveModelPaths] this needs no downloaded recogniser, which is
+  /// what lets skip-silence work on a device that never downloads the 228 MB
+  /// speech model: Silero VAD is 644 KB and ships inside the app.
+  static Future<String> resolveVadModelPath() async {
+    final modelsRoot = await ModelDownloadService.modelsRoot();
+    final vadDir = Directory(path.join(modelsRoot.path, 'silero_vad'));
+    if (!await vadDir.exists()) {
+      await vadDir.create(recursive: true);
+    }
+    final vadFile = File(path.join(vadDir.path, 'silero_vad.onnx'));
+    if (!await vadFile.exists()) {
+      final vadData = await rootBundle.load(_vadModelAssetPath);
+      await vadFile.writeAsBytes(vadData.buffer.asUint8List());
+    }
+    return vadFile.path;
+  }
+
   /// Copy the bundled support assets (tokens + VAD) to disk and resolve all
   /// model file paths. Assumes the STT model has already been downloaded —
   /// guard with [isModelReady] first.
   static Future<ModelPaths> resolveModelPaths() async {
-    // All model files live under Application Support, never Documents —
-    // see ModelDownloadService for why.
-    final modelsRoot = await ModelDownloadService.modelsRoot();
-
-    // STT model (SenseVoice) — downloaded at runtime, not bundled.
+    // STT model (SenseVoice) — downloaded at runtime, not bundled. Like every
+    // model file it lives under Application Support, never Documents — see
+    // ModelDownloadService for why.
     final modelFile = await ModelDownloadService.modelFile();
 
     // tokens.txt is small (~300 KB) and stays bundled.
@@ -42,20 +59,12 @@ class ModelAssetHelper {
     }
 
     // VAD model (Silero VAD) — small (~600 KB), stays bundled.
-    final vadDir = Directory(path.join(modelsRoot.path, 'silero_vad'));
-    if (!await vadDir.exists()) {
-      await vadDir.create(recursive: true);
-    }
-    final vadFile = File(path.join(vadDir.path, 'silero_vad.onnx'));
-    if (!await vadFile.exists()) {
-      final vadData = await rootBundle.load(_vadModelAssetPath);
-      await vadFile.writeAsBytes(vadData.buffer.asUint8List());
-    }
+    final vadModelPath = await resolveVadModelPath();
 
     return ModelPaths(
       modelPath: modelFile.path,
       tokensPath: tokensFile.path,
-      vadModelPath: vadFile.path,
+      vadModelPath: vadModelPath,
     );
   }
 }

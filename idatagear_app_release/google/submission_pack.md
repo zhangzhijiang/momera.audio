@@ -1,4 +1,4 @@
-# Play Console submission answers — Momera Recorder
+# Play Console submission answers — McRecorder
 
 Every non-graphic field and declaration the Console gates a release on, answered
 from the code rather than from memory. Where an answer is a judgement call, the
@@ -7,7 +7,8 @@ reasoning is given so you can overrule it.
 * **Package** `com.idatagear.momerarecording`
 * **minSdk 24** (Android 7.0) · **targetSdk 36** · **compileSdk 36**
 * Verified against `android/app/build.gradle.kts`, `AndroidManifest.xml`,
-  `pubspec.yaml` and `lib/` on 9 September 2026.
+  `pubspec.yaml` and `lib/` on 9 September 2026; app name and privacy URL
+refreshed 10 September 2026 for the rename to **McRecorder**.
 
 ---
 
@@ -18,12 +19,12 @@ description and release notes for `en-US`, `ja`, `ko`, `zh-CN`, `zh-TW`.
 
 | Field | Value |
 |---|---|
-| App name (≤30) | `Momera Recorder` (15) |
+| App name (≤30) | `McRecorder` (10) |
 | Category | Tools *(alternative: Productivity — Tools is the better fit; this is a recorder, not a workflow app)* |
 | Tags | Voice recorder, Transcription, Notes |
-| Contact email | zhangzhijiang@gmail.com |
-| Website | *(none yet — optional, but a privacy-policy URL is not; see below)* |
-| Privacy policy URL | **REQUIRED, AND MISSING.** See §7. |
+| Contact email | **support@idatagear.com** *(changed 2026-09-10 — a personal Gmail should not be the published developer contact; confirm this mailbox is monitored)* |
+| Website | `https://www.idatagear.com` |
+| Privacy policy URL | `https://www.idatagear.com/privacy-policy-mcrecorder.html` — **page written, not yet deployed (404).** See §7. |
 
 ---
 
@@ -134,18 +135,45 @@ asking for none of those is unusual enough to be reassuring.
 
 ---
 
-## 7. Blocking gap: privacy policy URL
+## 7. Privacy policy URL — page written, deployment still outstanding
 
 Play requires a **publicly reachable privacy policy URL** for every app,
-regardless of whether it collects data. There is no URL and no hosted page for
-this app anywhere in the repo.
+regardless of whether it collects data. App Store Connect requires one too, so
+**one page serves both stores.**
 
-The policy text is written and ready:
-[`../shared/legal/privacy_policy.md`](../shared/legal/privacy_policy.md). It has
-to be **hosted** and the URL pasted into the Console. Cheapest routes:
+Updated 2026-09-10: the page now exists as HTML, covering privacy **and** terms,
+written for both platforms (iOS background audio *and* the Android
+foreground-service notification, both stores' "no purchases" statement):
 
-* GitHub Pages on the existing repo, or a Gist rendered through a Pages site
-* Any static host — it is one page with no assets
+```
+idatagear_app_release/shared/legal/privacy-policy-mcrecorder.html
+```
+
+Target URL, byte-identical to the one in the App Store pack:
+
+```
+https://www.idatagear.com/privacy-policy-mcrecorder.html
+```
+
+**It is not deployed yet — the URL returns 404 today.** Deploy it into the site
+repo (`~/Developer/projects/idatagear/idatagear`, served from
+`github.com/zhangzhijiang/idatagear` at `www.idatagear.com`) beside the existing
+`privacy-policy-momera-hiking.html`, which is a standalone page in the same
+house style, then confirm:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' -L \
+  https://www.idatagear.com/privacy-policy-mcrecorder.html   # must be 200
+```
+
+Three facts are still yours to supply before it goes live — they are marked in
+the HTML as visibly highlighted `[[ … ]]` blocks: **governing law**, **venue**,
+and **iDataGear Inc.'s registered address**.
+
+> The older Android-only draft, `shared/legal/privacy_policy.md`, has been
+> **deleted**. It described Android's share sheet and preferences as if they were
+> the only platform, carried no terms section, and published a personal email
+> address. The HTML page above replaces it for both stores.
 
 This is the one item on this page that will stop a submission outright.
 

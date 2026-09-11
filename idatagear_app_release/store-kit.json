@@ -1,12 +1,12 @@
 {
   "_comment": [
-    "store-kit config for Momera Recorder. Toolkit lives at",
+    "store-kit config for McRecorder. Toolkit lives at",
     "~/Developer/projects/google_play_store_helper; see its README.md.",
     "candidateCount is deliberately absent: the default is 50 per tier, which",
     "is the target integration_test/store_screenshots.dart is written against."
   ],
   "package": "com.idatagear.momerarecording",
-  "appName": "Momera Recorder",
+  "appName": "McRecorder",
 
   "_iconMaster": [
     "The square logo with its near-white ground — the same file",

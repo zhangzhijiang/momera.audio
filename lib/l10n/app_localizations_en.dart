@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Momera Recorder';
+  String get appTitle => 'McRecorder';
 
   @override
   String get tapToRecord => 'Tap to record';

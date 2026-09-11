@@ -15,7 +15,7 @@ void main() {
 
     // Two: the splash title and the app bar behind it. FadeTransition keeps its
     // child mounted at zero opacity, so both exist from the first frame.
-    expect(find.text('Momera Recorder'), findsWidgets);
+    expect(find.text('McRecorder'), findsWidgets);
     // Lives in the record bar, outside the recordings AsyncLoading branch, so
     // it is already laid out under the splash.
     expect(find.text('Tap to record'), findsOneWidget);
@@ -26,7 +26,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
-    expect(find.text('Momera Recorder'), findsOneWidget);
+    expect(find.text('McRecorder'), findsOneWidget);
     expect(find.text('Tap to record'), findsOneWidget);
   });
 }

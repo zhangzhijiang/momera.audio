@@ -23,7 +23,7 @@ class MomeraRecordingApp extends ConsumerWidget {
     final themeMode = ref.watch(settingsProvider.select((s) => s.themeMode));
 
     return MaterialApp(
-      title: 'Momera Recorder',
+      title: 'McRecorder',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

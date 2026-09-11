@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-/// The UI languages Momera Recorder ships.
+/// The UI languages McRecorder ships.
 ///
 /// These mirror the five languages the speech model can transcribe, so the
 /// interface is never offered in a language whose audio the app cannot

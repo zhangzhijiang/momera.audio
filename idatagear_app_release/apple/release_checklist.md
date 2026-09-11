@@ -1,10 +1,10 @@
-# Momera Recorder — App Store release checklist
+# McRecorder — App Store release checklist
 
 Ordered so nothing below the blockers can usefully be started first.
 The *why* for every configuration choice is in
 [`release_guide.md`](release_guide.md).
 
-**Last verified: 2026-09-05** against version `1.0.0+2`.
+**Last verified: 2026-09-10** against version `1.0.0+9`, app name `McRecorder`.
 
 ---
 
@@ -27,7 +27,7 @@ The *why* for every configuration choice is in
 - [ ] **Agreements, Tax and Banking** — accept the current Paid/Free Apps
       agreement. Not needed for a free app with no IAP, but it blocks
       *everything* if you later add one and can take more than a day to clear.
-      Momera Recorder currently has **no in-app purchases**, so this is not a v1
+      McRecorder currently has **no in-app purchases**, so this is not a v1
       blocker.
 - [ ] *(not applicable)* In-app purchase products — the app has none.
 - [ ] *(not applicable)* AdMob console app and ad units — the app serves no ads.
@@ -43,8 +43,13 @@ re-prove it after any change, not because anything is outstanding.
       ```bash
       grep -c "PRODUCT_BUNDLE_IDENTIFIER = com.idatagear.momerarecording;" ios/Runner.xcodeproj/project.pbxproj  # expect 3
       ```
-- [x] **Deployment target is 15.5 in both places.** Raised from 13.0 by
-      `google_mlkit_translation`; see the guide for why and how to reverse it.
+- [x] **Deployment target is 15.5 in both places.**
+      Corrected 2026-09-10: the old note credited `google_mlkit_translation`
+      for raising this from 13.0. **That package, and the whole translation
+      feature, no longer exist** — `lib/core/translation/` and
+      `ios/Runner/TranslationBridge.swift` are gone and `pubspec.yaml` has no
+      mlkit dependency. 15.5 is still what ships; it simply has no
+      translation-shaped reason behind it any more.
       ```bash
       grep -c "IPHONEOS_DEPLOYMENT_TARGET = 15.5" ios/Runner.xcodeproj/project.pbxproj  # expect 3
       grep -n "^platform :ios, '15.5'" ios/Podfile                                      # expect 1 hit
@@ -56,7 +61,9 @@ re-prove it after any change, not because anything is outstanding.
       ```
 - [x] **iPhone only for v1.**
       ```bash
-      grep -c 'TARGETED_DEVICE_FAMILY = "1";' ios/Runner.xcodeproj/project.pbxproj  # expect 3
+      grep -c 'TARGETED_DEVICE_FAMILY = 1;' ios/Runner.xcodeproj/project.pbxproj  # expect 3
+      # NOTE: the project file writes this UNQUOTED. The quoted form this
+      # checklist used until 2026-09-10 returns 0 and silently proves nothing.
       ```
 - [x] **Microphone usage description present.** Missing this is a *crash* on
       first record, not a denied prompt.
@@ -90,7 +97,9 @@ re-prove it after any change, not because anything is outstanding.
 
 ### Still on a placeholder
 
-- [ ] **Version is `1.0.0+2`.** Fine for the first submission. Remember that
+- [ ] **Version is `1.0.0+9`** (`pubspec.yaml`). Fine for the first submission.
+      The App Store Connect *version* field takes `CFBundleShortVersionString`,
+      which is `1.0.0`. Remember that
       **App Store Connect reserves a build number permanently, even if you
       delete the build** — a failed upload means bump the *build* number
       (to `1.0.0+3`, and so on), not the version.
@@ -135,9 +144,15 @@ listing copy here.
 Three facts it will need from this port:
 
 - **iPhone only** — no iPad screenshots required. `TARGETED_DEVICE_FAMILY = "1"`.
-- **Four languages ship: English, Spanish, Simplified Chinese, Traditional
-  Chinese.** Screenshots and listing copy are needed for all four, not English
-  alone.
+- **FIVE languages ship: English, Japanese, Korean, Simplified Chinese,
+  Traditional Chinese** — `lib/l10n/app_{en,ja,ko,zh,zh_Hant}.arb`.
+  Corrected 2026-09-10: this line previously read "Four languages ship:
+  English, Spanish, Simplified Chinese, Traditional Chinese". **There is no
+  Spanish ARB and there never was one on this branch** (see `release_guide.md`
+  line 528, "Spanish was dropped"). Acting on the old sentence would have shipped
+  a listing missing `ja` and `ko` and carrying an untranslated `es`.
+  Apple keys Chinese on SCRIPT: `zh-Hans` / `zh-Hant`, never Play's
+  `zh-CN` / `zh-TW`.
 - **App Privacy: nothing is collected.** No data leaves the device; transcription
   is fully on-device. There must be **no** "Data Used to Track You" section.
 

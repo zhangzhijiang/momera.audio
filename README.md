@@ -1,4 +1,4 @@
-# Momera Recorder
+# McRecorder
 
 A simple, local-first **recorder** with **offline speech-to-text
 transcription**. It captures audio today; the name is deliberately not

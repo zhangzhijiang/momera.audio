@@ -1,4 +1,4 @@
-# Momera Recorder — Google Play listing copy
+# McRecorder — Google Play listing copy
 
 One `##` section per Play listing language. `en-US` is the default listing;
 every Play language not listed here falls back to it.
@@ -28,7 +28,7 @@ Voice recorder with offline speech-to-text. Your audio never leaves the phone.
 ### Full Description
 
 ```
-Momera Recorder is a voice recorder that turns what you said into text — and does it entirely on your own device.
+McRecorder is a voice recorder that turns what you said into text — and does it entirely on your own device.
 
 RECORDING
 • Tap once to record. Audio is saved as 16 kHz mono WAV: a plain, universal file you can open anywhere, not a format that locks you in.
@@ -85,7 +85,7 @@ First release.
 ### Full Description
 
 ```
-Momera Recorder は、話した内容をその場で文字にするボイスレコーダーです。処理はすべて端末の中で完結します。
+McRecorder は、話した内容をその場で文字にするボイスレコーダーです。処理はすべて端末の中で完結します。
 
 録音
 • タップするだけで録音開始。16 kHz モノラルの WAV で保存するので、どこでも開ける普通のファイルです。独自形式に縛られません。
@@ -142,7 +142,7 @@ Momera Recorder は、話した内容をその場で文字にするボイスレ�
 ### Full Description
 
 ```
-Momera Recorder는 말한 내용을 그대로 글로 옮겨 주는 음성 녹음기입니다. 모든 처리는 기기 안에서 끝납니다.
+McRecorder는 말한 내용을 그대로 글로 옮겨 주는 음성 녹음기입니다. 모든 처리는 기기 안에서 끝납니다.
 
 녹음
 • 한 번 누르면 녹음 시작. 16 kHz 모노 WAV로 저장하므로 어디서나 열 수 있는 평범한 파일이며, 독자 형식에 묶이지 않습니다.
@@ -199,7 +199,7 @@ Momera Recorder는 말한 내용을 그대로 글로 옮겨 주는 음성 녹음
 ### Full Description
 
 ```
-Momera Recorder 是一款把你说过的话直接变成文字的录音机，而且全部在手机本地完成。
+McRecorder 是一款把你说过的话直接变成文字的录音机，而且全部在手机本地完成。
 
 录音
 • 点一下就开始录。音频保存为 16 kHz 单声道 WAV——到哪儿都能打开的普通文件，不会被专有格式绑住。
@@ -256,7 +256,7 @@ Momera Recorder 是一款把你说过的话直接变成文字的录音机，而�
 ### Full Description
 
 ```
-Momera Recorder 是一款把你說過的話直接變成文字的錄音機，而且全部在手機本機完成。
+McRecorder 是一款把你說過的話直接變成文字的錄音機，而且全部在手機本機完成。
 
 錄音
 • 按一下就開始錄。音訊存成 16 kHz 單聲道 WAV——到哪裡都打得開的普通檔案，不會被專有格式綁住。

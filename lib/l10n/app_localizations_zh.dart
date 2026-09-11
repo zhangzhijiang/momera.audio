@@ -9,7 +9,7 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'Momera Recorder';
+  String get appTitle => 'McRecorder';
 
   @override
   String get tapToRecord => '点击录音';
@@ -415,7 +415,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
 
   @override
-  String get appTitle => 'Momera Recorder';
+  String get appTitle => 'McRecorder';
 
   @override
   String get tapToRecord => '點擊錄音';

@@ -1,4 +1,4 @@
-// Store screenshots for Momera Recorder — the screen list for Play and Apple.
+// Store screenshots for McRecorder — the screen list for Play and Apple.
 //
 //   ./idatagear_app_release/store-kit shoot                  # every tier x locale
 //   ./idatagear_app_release/store-kit shoot --tier phone --locale ja

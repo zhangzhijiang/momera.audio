@@ -1,4 +1,4 @@
-# Google Play listing — Momera Recorder
+# Google Play listing — McRecorder
 
 Everything the Play Console needs, and how to regenerate it.
 

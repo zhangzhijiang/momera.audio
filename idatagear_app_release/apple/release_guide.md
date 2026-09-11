@@ -1,4 +1,4 @@
-# Momera Recorder — iOS release guide
+# McRecorder — iOS release guide
 
 Reference for *how* and *why* the iOS build is configured the way it is.
 Companion to [`release_checklist.md`](release_checklist.md), which is the
@@ -41,7 +41,7 @@ here, the answer is yes.
 |---|---|---|---|
 | Application id | `com.idatagear.momerarecording` | `com.idatagear.momerarecording` | **Deliberately identical.** `flutter create` derives an id from the Dart package name; that was overridden to match Android. Nothing forced a difference and a matching id is one less thing to get wrong. |
 | Minimum OS | `minSdk 24` (Android 7.0) | `IPHONEOS_DEPLOYMENT_TARGET 13.0` | Set by different plugin floors — see below. |
-| Display name | `Momera Recorder` (`AndroidManifest.xml`) | `Momera Recorder` (`CFBundleDisplayName`) | Same string; different mechanism. |
+| Display name | `McRecorder` (`AndroidManifest.xml`) | `McRecorder` (`CFBundleDisplayName`) | Same string; different mechanism. |
 | Signing | Upload keystore via `android/key.properties` | Automatic, `DEVELOPMENT_TEAM = 6ZWZ3Z58ZT` | Platform mechanics. |
 | Model storage | app support dir | `Library/Application Support` | Same Dart call, `getApplicationSupportDirectory()`. Listed only because the *reason* is iOS-specific — see below. |
 | Backup exclusion | no-op | `NSURLIsExcludedFromBackupKey` via method channel | Android has no iCloud backup of app-private files to opt out of. The Dart side branches on `defaultTargetPlatform` and returns early. |
@@ -71,31 +71,24 @@ here, the answer is yes.
 `IPHONEOS_DEPLOYMENT_TARGET = 15.5`, set in `ios/Runner.xcodeproj/project.pbxproj`
 (all three configurations) and `ios/Podfile`.
 
-> **It was 13.0 until translation was added.** `google_mlkit_translation`
-> declares an iOS deployment target of **15.5**, and Flutter has no way to
-> include a plugin on one platform only — if the package is a dependency, its
-> pod ships and the whole app's floor moves with it. The bump was a deliberate,
-> approved trade for offline translation on iOS 15.5–17.x; without it, iOS
-> would have had no translation below 18, where Apple's own API begins.
+> **Corrected 2026-09-10.** This block used to explain 15.5 as the price of
+> `google_mlkit_translation`, which declared an iOS floor of 15.5. **That
+> package has since been removed along with the entire translation feature**, so
+> nothing in the current dependency graph forces 15.5 any more.
 >
-> **15.5 is deliberate and permanent. Do not treat it as a regression to
-> undo.** Reverting to 13.0 was measured and explicitly rejected on
-> 2026-09-05: Apple raises the minimum iOS version it will accept over time,
-> and this app would arrive at 15.5 regardless — so the floor is not really a
-> cost of ML Kit, it is a cost that was coming anyway. Paying it early buys
-> offline translation on iOS 15.5–17.x.
+> **15.5 was nevertheless kept, deliberately.** Apple raises the minimum iOS
+> version it will accept over time, and this app would arrive at 15.5 regardless;
+> dropping back to 13.0 now would only have to be undone later. Treat 15.5 as a
+> deliberate floor, **not** as a leftover of a feature that no longer exists and
+> **not** as a regression to undo.
 >
-> For background only: reverting would mean removing `google_mlkit_translation`
-> entirely and either dropping iOS translation below 18 or driving ML Kit's
-> Android SDK through a native method channel instead of the Flutter plugin.
-> That would save ~48 MB of iOS binary, and cost offline translation for a band
-> of iOS versions that shrinks every month.
+> Today the highest floor any remaining plugin declares is **13.0**, so 15.5 is
+> currently a choice rather than a constraint.
 
-**Below the ML Kit constraint, two plugins independently require 13.0.**
+**What the remaining plugins actually require:**
 
 | Plugin | iOS floor |
 |---|---|
-| **`google_mlkit_translation` 0.15.1** | **15.5** ← binding constraint |
 | `sherpa_onnx_ios` 1.13.2 | 13.0 |
 | `shared_preferences_foundation` 2.5.7 | 13.0 |
 | `record_ios` 1.2.1 | 12.0 |
@@ -166,7 +159,7 @@ set the flag is logged rather than propagated — it must never fail a download.
 
 ## No tracking — deliberate, and recorded so nobody re-derives it
 
-Momera Recorder ships **no tracking of any kind**, and this is a decision, not an
+McRecorder ships **no tracking of any kind**, and this is a decision, not an
 oversight. Recorded here so it is not re-litigated later:
 
 - No ads SDK, no analytics, no crash reporting, no attribution SDK.
@@ -221,7 +214,7 @@ Only what was necessary. Everything below was verified with a real command.
 - `ios/Podfile`: uncommented `platform :ios, '13.0'`.
 - `ios/Runner/Info.plist`: added `NSMicrophoneUsageDescription`,
   `ITSAppUsesNonExemptEncryption = false`, `UIBackgroundModes = [audio]`; set
-  `CFBundleDisplayName` to `Momera Recorder`.
+  `CFBundleDisplayName` to `McRecorder`.
 - `ios/Runner/PrivacyInfo.xcprivacy`: created and added to the Runner target's
   Resources build phase (verified present inside the built `.app`, not just on
   disk — a manifest that is not a target member is ignored by Apple).
@@ -352,8 +345,13 @@ it is a visible change to the Android UI and should be eyeballed on a device.
 
 ## Settings screen and localization
 
-Added after the port proper. Four UI languages ship: **English, Spanish,
-Simplified Chinese, Traditional Chinese**.
+Added after the port proper. **FIVE** UI languages ship: **English, Japanese,
+Korean, Simplified Chinese, Traditional Chinese**.
+
+> **Corrected 2026-09-10.** This line read "Four UI languages ship: English,
+> Spanish, Simplified Chinese, Traditional Chinese". There is no Spanish ARB,
+> and Japanese and Korean were missing from the list. The correct table is the
+> one further down this file under "UI languages mirror the model's languages".
 
 ### How the locales are wired
 
@@ -403,7 +401,7 @@ visible usage figure is hard to set sensibly.
 
 ### Consequence for the store listing
 
-The app now ships in four languages, so `/idatagear-apple-store-assets` must
+The app now ships in five languages, so `/idatagear-apple-store-assets` must
 produce screenshots and listing copy for **en, es, zh-Hans, zh-Hant** — not
 English alone.
 
@@ -633,165 +631,36 @@ words will not find it.
 
 ---
 
-## Translation
+## Translation — REMOVED, chapter retired 2026-09-10
 
-Transcripts can be translated between English, Chinese (Simplified and
-Traditional), Japanese and Korean. Engine selection is per device:
+**This chapter is gone because the feature is gone.** It used to document
+`google_mlkit_translation`, Apple's `TranslationSession`, a
+`TranslatorRegistry`, Cantonese source refusal, and an iOS-Simulator
+architecture trap caused by `MLKitTranslate.framework`.
 
-| Platform | Engine | Notes |
-|---|---|---|
-| iOS 18+ | **Apple Translation** | Preferred. System manages the models — nothing for the app to download or explain — and it distinguishes Simplified from Traditional Chinese. |
-| iOS 15.5–17.x | **Google ML Kit** | ~30 MB model per language, downloaded on demand. |
-| Android | **Google ML Kit** | Same. |
-| Cantonese | **none** | See below. |
-
-### The Apple bridge is more involved than it looks
-
-`ios/Runner/TranslationBridge.swift`.
-
-On iOS 18 through 26.3 `TranslationSession` has **no public initialiser** — it
-can only be vended by SwiftUI's `.translationTask` modifier. iOS 26.4 added a
-direct `init()`, but the app supports earlier versions, so the app hosts a
-zero-sized SwiftUI view off-screen, lets SwiftUI hand it a session, resumes a
-continuation with the result, and tears the host down. Requests are serialised
-on the main actor because two sessions sharing one host would race.
-
-Everything is behind `#available(iOS 18, *)`; below that the channel reports
-unavailable and Dart falls back to ML Kit.
-
-### ML Kit cannot tell Simplified from Traditional
-
-ML Kit has a single `chinese` language and returns Simplified. A user on
-Android or iOS 17 who asks for Traditional gets Simplified text. Apple's engine
-handles the distinction properly. This is a known, documented downgrade rather
-than a bug.
-
-### Cantonese has no on-device engine
-
-Neither ML Kit nor Apple translates Cantonese, even though the speech model
-transcribes it. `TranslationService.translate` **refuses** a Cantonese source
-rather than routing it through Chinese — that would return plausible-looking
-text with Cantonese-specific vocabulary and grammar silently mistranslated,
-which is worse than declining. The UI lists Cantonese greyed out with the
-reason.
-
-This is the concrete justification for the online engine slot.
-
-### The online engine is a seam, not an implementation
-
-`OnlineTranslator` in `lib/core/translation/translator.dart` is an abstract type
-with **no implementation and no provider chosen**. Everything above it — engine
-selection, UI, persistence — is written against `Translator`, so adding a cloud
-engine later is a new file plus one entry in `TranslatorRegistry`.
-
-**Implementing it is not just a code change.** The app currently tells users
-transcription "runs fully offline" and its `PrivacyInfo.xcprivacy` declares
-`NSPrivacyCollectedDataTypes = []` — nothing collected. Sending a transcript to
-a server contradicts both. The manifest, the App Store App Privacy answers, that
-copy and a privacy policy all have to change together, and consent must be
-explicit per use — never a silent fallback when an offline engine lacks a pair.
-
-### A multilingual recording cannot be translated
-
-ML Kit needs one definite source language. `TranslationService.sourceFor`
-returns null when the recogniser detected none or several, and the UI says so
-rather than guessing — translating a Cantonese/English conversation as if it
-were all Cantonese would mangle half of it.
-
-### ⚠️ Size cost, and it is now a constraint
-
-Adding ML Kit roughly doubled both binaries:
-
-| | Before translation | After |
-|---|---|---|
-| iOS `Runner.app` | 51.2 MB | **99.5 MB** |
-| Android AAB | 100.8 MB | **141.7 MB** |
-
-`MLKitTranslate.framework` is the bulk of it: 105 MB on disk as a fat binary
-(`x86_64` + `arm64`), of which one slice links in. Its bundled resources are
-only 40 KB, so that is inference-engine **code**, not models — the language
-models are downloaded separately and on demand, ~30 MB each.
-
-*(`MLKitVision` arrives as a dependency of `MLKitCommon` despite this app doing
-no vision work, but at 1.9 MB it is not the problem. An earlier note in this
-guide blamed it; that was wrong.)*
-
-### Android: measured, and not a problem
-
-Measured 2026-09-05 by reading the AAB directly, since `bundletool` is not
-installed:
-
-| | Compressed |
-|---|---|
-| AAB on disk | 141.7 MB |
-| …of which `BUNDLE-METADATA` (debug symbols, **never shipped**) | 59.0 MB |
-| …of which three ABIs, one delivered per device | 24–29 MB each |
-| **Actual download, arm64 phone** | **≈ 29.7 MB** |
-
-**The AAB file size is not the number that matters and never was.** Nothing
-here is close to a Play limit.
-
-Inside that arm64 payload:
-
-| | Compressed | Share |
-|---|---|---|
-| sherpa-onnx (`libonnxruntime.so` + APIs) | 11.4 MB | 43% |
-| **ML Kit** (`libtranslate_jni.so`) | **6.8 MB** | 26% |
-| Flutter engine | 5.4 MB | 21% |
-| other | 2.7 MB | 10% |
-
-So on Android the speech engine is nearly **twice** the size of the translation
-engine. Deferring ML Kit behind Play Feature Delivery would save ~6.8 MB of a
-~30 MB download and is not worth the machinery. If Android size ever matters,
-ONNX Runtime is the target.
-
-### ⚠️ ML Kit breaks the iOS Simulator on Apple Silicon
-
-**The app can no longer be run on the iOS Simulator on an Apple Silicon Mac.**
-Install fails with:
-
-```
-Failed to find matching arch for input file: .../Runner.app/Runner
-```
-
-Cause, confirmed on 2026-09-05:
+None of that is in the tree any more:
 
 ```bash
-lipo -info build/ios/iphonesimulator/Runner.app/Runner
-#   Non-fat file: ... is architecture: x86_64
-
-find ios/Pods/MLKitTranslate -name "*.xcframework"   # nothing
-vtool -arch arm64 -show-build-version \
-  ios/Pods/MLKitTranslate/Frameworks/MLKitTranslate.framework/MLKitTranslate
-#   platform IOS      <- device, not simulator
+ls lib/core/translation                 # No such file or directory
+ls ios/Runner/TranslationBridge.swift   # No such file or directory
+grep -rn "mlkit\|translation" pubspec.yaml ios/Podfile   # no output
 ```
 
-`MLKitTranslate` ships as a **plain fat `.framework`, not an `.xcframework`**,
-and its arm64 slice is the *device* slice. A plain framework cannot carry both
-device-arm64 and simulator-arm64, so there is no simulator-arm64 slice at all.
-The simulator build therefore falls back to x86_64, which an Apple Silicon
-simulator will not run.
+Consequences that outlived the feature, so they are recorded here rather than
+lost with the chapter:
 
-**Device builds are unaffected** — the device arm64 slice is present and
-`flutter build ios --release` works.
+* **`IPHONEOS_DEPLOYMENT_TARGET` is still 15.5.** ML Kit was the original reason
+  for raising it from 13.0; that reason no longer exists. The floor was kept
+  deliberately — Apple raises its accepted minimum over time and this app would
+  reach 15.5 regardless — but it is no longer a translation trade. See
+  "Why the deployment target is 15.5" above.
+* **The iOS Simulator works again.** The x86_64-only-slice trap was
+  `MLKitTranslate.framework`'s doing. With that pod gone, arm64 simulator builds
+  run normally, so simulator screenshot capture is viable again — which is how
+  `idatagear_app_release/apple/screenshots/` was shot.
+* **No listing copy claims translation.** `apple/submission_pack.md` and
+  `google/listing.md` were both written against the current binary and mention
+  transcription only.
 
-Workarounds, in order of preference:
-
-1. **Test on a physical device.** Which the release checklist requires anyway.
-2. **Use the Android emulator** for UI work — the ML Kit AAR does ship
-   `arm64-v8a`, so the emulator runs fine.
-3. A Rosetta (x86_64) simulator, if your Xcode still offers one.
-
-This was introduced by the translation feature and went unnoticed for a commit,
-because simulator runs stopped once translation landed. **If a UI change needs
-visual checking, use the Android emulator or a device — do not assume the iOS
-Simulator still works.**
-
-### iOS carries the same feature at seven times the cost
-
-+48 MB on iOS versus 6.8 MB on Android, and iOS cannot defer it: On-Demand
-Resources cover assets, not linked frameworks, so code in the binary ships in
-the binary. That asymmetry — not the Android figure — is the real size finding.
-
-On top of all this, the app downloads a 228 MB speech model at first use.
-**Weigh size before adding another SDK.**
+The app transcribes; it does not translate. If translation ever returns, write a
+new chapter against the code that ships it rather than reviving this one.

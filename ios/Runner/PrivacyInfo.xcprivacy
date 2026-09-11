@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Momera Recorder does not track users. There is deliberately no
+	<!-- McRecorder does not track users. There is deliberately no
 	     NSPrivacyTrackingDomains key: Apple rejects a manifest that declares
 	     tracking domains with NSPrivacyTracking false, and equally rejects
 	     NSPrivacyTracking true with an empty domain list (ITMS-91064). -->

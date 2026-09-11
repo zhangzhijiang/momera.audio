@@ -61,7 +61,7 @@ class RecordingService : Service() {
      */
     private var isForeground = false
 
-    private var title: String = "Momera Recorder"
+    private var title: String = "McRecorder"
     private var body: String = "Recording in progress"
     private var stopLabel: String = "Stop"
     private var seconds: Int = 0

@@ -1,6 +1,6 @@
 {
-    "name": "Momera Recorder",
-    "short_name": "Momera Recorder",
+    "name": "McRecorder",
+    "short_name": "McRecorder",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#8B5CF6",

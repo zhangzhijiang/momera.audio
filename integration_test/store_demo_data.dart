@@ -1,7 +1,7 @@
 // Demo library for store screenshots — the recordings the listing shows.
 //
 // WHY THIS FILE EXISTS
-// A freshly installed Momera Recorder has an empty recordings folder, and the
+// A freshly installed McRecorder has an empty recordings folder, and the
 // screens worth photographing (waveforms, transcripts, search hits, the History
 // calendar, detected languages) all need content. `shoot` wipes app data before
 // every run, so the content has to be rebuilt in-process at the start of each
